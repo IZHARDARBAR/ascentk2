@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Clock, ArrowRight, X, Calendar, User } from 'lucide-react';
-import { journalArticles } from '../data/journalData';
+import { useTreks } from '../context/TreksContext';
 
 export default function JournalPage() {
+  const { articles } = useTreks();
   const [selectedArticle, setSelectedArticle] = useState(null);
 
   return (
@@ -25,66 +26,72 @@ export default function JournalPage() {
         </div>
 
         {/* Articles Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {journalArticles.map((article, idx) => (
-            <motion.article
-              key={article.id}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.45, delay: idx * 0.08 }}
-              className="group bg-white border border-[#D8D5CA] rounded-xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-xl transition-all"
-            >
-              <div>
-                <div
-                  onClick={() => setSelectedArticle(article)}
-                  className="relative aspect-[16/10] overflow-hidden cursor-pointer"
-                >
-                  <img
-                    src={article.coverImage}
-                    alt={article.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                  />
-                  <span className="absolute top-4 left-4 bg-[#142C25] text-[#C5A46D] text-[11px] font-semibold uppercase tracking-widest px-3 py-1 rounded-sm">
-                    {article.category}
-                  </span>
-                </div>
-
-                <div className="p-6">
-                  <div className="flex items-center gap-3 text-xs text-[#151A18]/60 mb-2">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5 text-[#C5A46D]" /> {article.readTime}
+        {articles.length === 0 ? (
+          <div className="bg-white border border-[#D8D5CA] rounded-xl p-12 text-center">
+            <p className="font-serif text-2xl text-[#151A18]">No journal articles published yet.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {articles.map((article, idx) => (
+              <motion.article
+                key={article.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.45, delay: idx * 0.08 }}
+                className="group bg-white border border-[#D8D5CA] rounded-xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-xl transition-all"
+              >
+                <div>
+                  <div
+                    onClick={() => setSelectedArticle(article)}
+                    className="relative aspect-[16/10] overflow-hidden cursor-pointer"
+                  >
+                    <img
+                      src={article.coverImage}
+                      alt={article.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+                    />
+                    <span className="absolute top-4 left-4 bg-[#142C25] text-[#C5A46D] text-[11px] font-semibold uppercase tracking-widest px-3 py-1 rounded-sm">
+                      {article.category}
                     </span>
-                    <span>·</span>
-                    <span>{article.date}</span>
                   </div>
 
-                  <h2
-                    onClick={() => setSelectedArticle(article)}
-                    className="font-serif text-2xl font-semibold text-[#151A18] group-hover:text-[#142C25] cursor-pointer transition-colors"
-                  >
-                    {article.title}
-                  </h2>
+                  <div className="p-6">
+                    <div className="flex items-center gap-3 text-xs text-[#151A18]/60 mb-2">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 text-[#C5A46D]" /> {article.readTime}
+                      </span>
+                      <span>·</span>
+                      <span>{article.date}</span>
+                    </div>
 
-                  <p className="mt-3 text-sm text-[#151A18]/75 leading-relaxed">
-                    {article.excerpt}
-                  </p>
+                    <h2
+                      onClick={() => setSelectedArticle(article)}
+                      className="font-serif text-2xl font-semibold text-[#151A18] group-hover:text-[#142C25] cursor-pointer transition-colors"
+                    >
+                      {article.title}
+                    </h2>
+
+                    <p className="mt-3 text-sm text-[#151A18]/75 leading-relaxed">
+                      {article.excerpt}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="px-6 py-4 border-t border-[#D8D5CA]/60 flex items-center justify-between">
-                <span className="text-xs font-medium text-[#151A18]/60">{article.author}</span>
-                <button
-                  onClick={() => setSelectedArticle(article)}
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#142C25] hover:text-[#C5A46D] transition"
-                >
-                  <span>Read Article</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.article>
-          ))}
-        </div>
+                <div className="px-6 py-4 border-t border-[#D8D5CA]/60 flex items-center justify-between">
+                  <span className="text-xs font-medium text-[#151A18]/60">{article.author}</span>
+                  <button
+                    onClick={() => setSelectedArticle(article)}
+                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#142C25] hover:text-[#C5A46D] transition"
+                  >
+                    <span>Read Article</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        )}
 
         {/* Bottom CTA */}
         <div className="mt-20 bg-[#142C25] text-white rounded-2xl p-8 sm:p-12 flex flex-col md:flex-row items-center justify-between gap-6">
@@ -159,7 +166,7 @@ export default function JournalPage() {
                 </h2>
 
                 <div className="space-y-4 text-base text-[#151A18]/85 leading-relaxed">
-                  {selectedArticle.content.map((para, i) => (
+                  {(selectedArticle.content || []).map((para, i) => (
                     <p key={i}>{para}</p>
                   ))}
                 </div>

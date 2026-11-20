@@ -5,6 +5,7 @@ import {
   Mountain,
   Inbox,
   Database,
+  BookOpen,
   Plus,
   Trash2,
   Pencil,
@@ -65,13 +66,30 @@ const emptyTrekTemplate = {
   ],
 };
 
+const emptyArticleTemplate = {
+  title: '',
+  slug: '',
+  category: 'Expedition Guide',
+  readTime: '5 min read',
+  date: 'March 2025',
+  author: 'Ahmed Khan · IFMGA Lead Guide',
+  coverImage:
+    'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1400&q=80',
+  excerpt: '',
+  content: [''],
+};
+
 export default function AdminPage() {
   const {
     treks,
+    articles,
     inquiries,
     addTrek,
     updateTrek,
     deleteTrek,
+    addArticle,
+    updateArticle,
+    deleteArticle,
     updateInquiryStatus,
     deleteInquiry,
     resetDemoData,
@@ -83,8 +101,15 @@ export default function AdminPage() {
 
   const [activeTab, setActiveTab] = useState('treks');
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Trek Editor State
   const [editingTrek, setEditingTrek] = useState(null);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isCreatingTrek, setIsCreatingTrek] = useState(false);
+
+  // Journal Editor State
+  const [editingArticle, setEditingArticle] = useState(null);
+  const [isCreatingArticle, setIsCreatingArticle] = useState(false);
+
   const [toast, setToast] = useState('');
 
   const showToast = (msg) => {
@@ -102,13 +127,17 @@ export default function AdminPage() {
     }
   };
 
-  const openCreateForm = () => {
-    setIsCreating(true);
+  // ---------------- TREK HANDLERS ----------------
+  const openCreateTrek = () => {
+    setActiveTab('treks');
+    setEditingArticle(null);
+    setIsCreatingTrek(true);
     setEditingTrek(JSON.parse(JSON.stringify(emptyTrekTemplate)));
   };
 
-  const openEditForm = (trek) => {
-    setIsCreating(false);
+  const openEditTrek = (trek) => {
+    setEditingArticle(null);
+    setIsCreatingTrek(false);
     const cloned = JSON.parse(JSON.stringify(trek));
     if (!cloned.departures) cloned.departures = [];
     if (!cloned.overview) cloned.overview = [''];
@@ -143,9 +172,9 @@ export default function AdminPage() {
       })),
     };
 
-    if (isCreating) {
+    if (isCreatingTrek) {
       addTrek(cleanTrek);
-      showToast('New trek & itinerary added to live site!');
+      showToast('New trek & itinerary added!');
     } else {
       updateTrek(cleanTrek.id, cleanTrek);
       showToast('Trek & itinerary updated!');
@@ -153,7 +182,6 @@ export default function AdminPage() {
     setEditingTrek(null);
   };
 
-  // Itinerary handlers
   const addItineraryDay = () => {
     const nextDayNum =
       editingTrek.itinerary.length > 0
@@ -191,7 +219,6 @@ export default function AdminPage() {
     }));
   };
 
-  // Departures handlers
   const addDeparture = () => {
     setEditingTrek((prev) => ({
       ...prev,
@@ -223,7 +250,6 @@ export default function AdminPage() {
     }));
   };
 
-  // String list handlers
   const updateListItem = (listKey, idx, value) => {
     setEditingTrek((prev) => {
       const next = [...prev[listKey]];
@@ -246,12 +272,70 @@ export default function AdminPage() {
     }));
   };
 
+  // ---------------- JOURNAL HANDLERS ----------------
+  const openCreateArticle = () => {
+    setActiveTab('journal');
+    setEditingTrek(null);
+    setIsCreatingArticle(true);
+    setEditingArticle(JSON.parse(JSON.stringify(emptyArticleTemplate)));
+  };
+
+  const openEditArticle = (article) => {
+    setEditingTrek(null);
+    setIsCreatingArticle(false);
+    const cloned = JSON.parse(JSON.stringify(article));
+    if (!cloned.content || cloned.content.length === 0) cloned.content = [''];
+    setEditingArticle(cloned);
+  };
+
+  const handleSaveArticle = (e) => {
+    e.preventDefault();
+    if (!editingArticle.title.trim()) return;
+
+    const cleanArticle = {
+      ...editingArticle,
+      content: (editingArticle.content || []).filter((p) => p.trim() !== ''),
+    };
+
+    if (isCreatingArticle) {
+      addArticle(cleanArticle);
+      showToast('New journal article published!');
+    } else {
+      updateArticle(cleanArticle.id, cleanArticle);
+      showToast('Journal article updated!');
+    }
+    setEditingArticle(null);
+  };
+
+  const updateArticleParagraph = (idx, value) => {
+    setEditingArticle((prev) => {
+      const next = [...prev.content];
+      next[idx] = value;
+      return { ...prev, content: next };
+    });
+  };
+
+  const addArticleParagraph = () => {
+    setEditingArticle((prev) => ({
+      ...prev,
+      content: [...prev.content, ''],
+    }));
+  };
+
+  const removeArticleParagraph = (idx) => {
+    setEditingArticle((prev) => ({
+      ...prev,
+      content: prev.content.filter((_, i) => i !== idx),
+    }));
+  };
+
   const filteredTreks = treks.filter(
     (t) =>
       (t.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (t.location || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Demo Gate
   if (!unlocked) {
     return (
       <div className="min-h-screen bg-[#151A18] flex items-center justify-center px-6 pt-28 pb-16">
@@ -263,7 +347,7 @@ export default function AdminPage() {
           <p className="text-sm text-white/70 mt-2 leading-relaxed">
             Frontend preview mode (localStorage). Enter demo PIN{' '}
             <span className="text-[#C5A46D] font-semibold">2025</span> to manage treks,
-            itineraries, departures, and inquiries.
+            itineraries, journal articles, and inquiries.
           </p>
 
           <form onSubmit={handleUnlock} className="mt-6 space-y-4">
@@ -312,7 +396,7 @@ export default function AdminPage() {
             <button
               onClick={() => {
                 resetDemoData();
-                showToast('Restored default Karakoram treks & inquiries.');
+                showToast('Restored default treks, journal & inquiries.');
               }}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#D8D5CA] bg-white text-xs font-semibold text-[#151A18] hover:border-[#142C25] transition"
             >
@@ -320,7 +404,14 @@ export default function AdminPage() {
               <span>Reset Demo Data</span>
             </button>
             <button
-              onClick={openCreateForm}
+              onClick={openCreateArticle}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] text-sm font-semibold transition shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Journal Post</span>
+            </button>
+            <button
+              onClick={openCreateTrek}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#142C25] hover:bg-[#151A18] text-white text-sm font-semibold transition shadow-sm"
             >
               <Plus className="w-4 h-4 text-[#C5A46D]" />
@@ -334,6 +425,7 @@ export default function AdminPage() {
           {[
             { id: 'overview', label: 'Overview', icon: LayoutDashboard },
             { id: 'treks', label: `Treks & Itineraries (${treks.length})`, icon: Mountain },
+            { id: 'journal', label: `Journal (${articles.length})`, icon: BookOpen },
             { id: 'inquiries', label: `Inquiries (${inquiries.length})`, icon: Inbox },
             { id: 'firebase', label: 'Firebase Schema', icon: Database },
           ].map((tab) => (
@@ -342,6 +434,7 @@ export default function AdminPage() {
               onClick={() => {
                 setActiveTab(tab.id);
                 setEditingTrek(null);
+                setEditingArticle(null);
               }}
               className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium transition ${
                 activeTab === tab.id
@@ -356,17 +449,15 @@ export default function AdminPage() {
         </div>
 
         {/* OVERVIEW */}
-        {activeTab === 'overview' && !editingTrek && (
+        {activeTab === 'overview' && !editingTrek && !editingArticle && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
               <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Total Treks</span>
               <div className="font-serif text-4xl font-bold text-[#142C25] mt-2">{treks.length}</div>
             </div>
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
-              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Featured on Home</span>
-              <div className="font-serif text-4xl font-bold text-[#C5A46D] mt-2">
-                {treks.filter((t) => t.featured).length}
-              </div>
+              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Journal Articles</span>
+              <div className="font-serif text-4xl font-bold text-[#C5A46D] mt-2">{articles.length}</div>
             </div>
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
               <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Total Inquiries</span>
@@ -403,7 +494,7 @@ export default function AdminPage() {
                       <th className="px-6 py-4">Trek Name</th>
                       <th className="px-6 py-4">Duration</th>
                       <th className="px-6 py-4">Difficulty</th>
-                      <th className="px-6 py-4">Itinerary Days</th>
+                      <th className="px-6 py-4">Itinerary</th>
                       <th className="px-6 py-4">Price</th>
                       <th className="px-6 py-4">Featured</th>
                       <th className="px-6 py-4 text-right">Actions</th>
@@ -453,7 +544,7 @@ export default function AdminPage() {
                               <ExternalLink className="w-4 h-4" />
                             </Link>
                             <button
-                              onClick={() => openEditForm(trek)}
+                              onClick={() => openEditTrek(trek)}
                               className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#142C25]"
                               title="Edit Trek & Itinerary"
                             >
@@ -480,7 +571,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* CREATE / EDIT TREK & ITINERARY BUILDER */}
+        {/* CREATE / EDIT TREK */}
         {editingTrek && (
           <form
             onSubmit={handleSaveTrek}
@@ -489,7 +580,7 @@ export default function AdminPage() {
             <div className="flex items-center justify-between pb-6 border-b border-[#D8D5CA]">
               <div>
                 <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#151A18]">
-                  {isCreating ? 'Create New Trek & Itinerary' : `Editing: ${editingTrek.name}`}
+                  {isCreatingTrek ? 'Create New Trek & Itinerary' : `Editing: ${editingTrek.name}`}
                 </h2>
                 <p className="text-xs text-[#151A18]/60 mt-1">
                   Changes sync immediately across Home, All Treks, and Trek Detail pages.
@@ -641,15 +732,13 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* FIXED GROUP DEPARTURES BUILDER */}
+            {/* FIXED GROUP DEPARTURES */}
             <div className="pt-6 border-t border-[#D8D5CA] space-y-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-serif text-2xl font-semibold text-[#151A18] flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-[#C5A46D]" />
-                    <span>Fixed Group Departures</span>
-                  </h3>
-                </div>
+                <h3 className="font-serif text-2xl font-semibold text-[#151A18] flex items-center gap-2">
+                  <Calendar className="w-5 h-5 text-[#C5A46D]" />
+                  <span>Fixed Group Departures</span>
+                </h3>
                 <button
                   type="button"
                   onClick={addDeparture}
@@ -715,7 +804,7 @@ export default function AdminPage() {
               ))}
             </div>
 
-            {/* DAY-BY-DAY ITINERARY BUILDER */}
+            {/* ITINERARY BUILDER */}
             <div className="pt-6 border-t border-[#D8D5CA] space-y-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -877,6 +966,259 @@ export default function AdminPage() {
           </form>
         )}
 
+        {/* =====================================================
+            JOURNAL LIST (ADD / EDIT / REMOVE)
+           ===================================================== */}
+        {activeTab === 'journal' && !editingArticle && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-[#151A18]/70">
+                Manage field dispatches, training guides, and visa articles published on{' '}
+                <Link to="/journal" className="text-[#142C25] font-semibold underline">
+                  /journal
+                </Link>
+                .
+              </p>
+              <button
+                onClick={openCreateArticle}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#142C25] text-white text-xs font-semibold"
+              >
+                <Plus className="w-4 h-4 text-[#C5A46D]" />
+                <span>Write New Article</span>
+              </button>
+            </div>
+
+            {articles.length === 0 ? (
+              <div className="bg-white border border-[#D8D5CA] rounded-xl p-12 text-center">
+                <p className="font-serif text-2xl text-[#151A18]">No journal articles found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {articles.map((article) => (
+                  <div
+                    key={article.id}
+                    className="bg-white border border-[#D8D5CA] rounded-xl overflow-hidden flex flex-col justify-between shadow-sm"
+                  >
+                    <div>
+                      <img
+                        src={article.coverImage}
+                        alt={article.title}
+                        className="w-full h-44 object-cover"
+                      />
+                      <div className="p-5 space-y-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-[#C5A46D]">
+                          {article.category} · {article.date}
+                        </span>
+                        <h3 className="font-serif text-xl font-semibold text-[#151A18]">
+                          {article.title}
+                        </h3>
+                        <p className="text-xs text-[#151A18]/70 line-clamp-2">{article.excerpt}</p>
+                      </div>
+                    </div>
+
+                    <div className="px-5 py-3.5 border-t border-[#D8D5CA]/60 flex items-center justify-between bg-[#F6F5F0]/50">
+                      <span className="text-xs text-[#151A18]/60">{article.readTime}</span>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => openEditArticle(article)}
+                          className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-[#142C25] text-[#142C25]"
+                          title="Edit Article"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteArticle(article.id);
+                            showToast(`Removed article: ${article.title}`);
+                          }}
+                          className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-red-500 text-red-600"
+                          title="Remove Article"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* CREATE / EDIT JOURNAL ARTICLE */}
+        {editingArticle && (
+          <form
+            onSubmit={handleSaveArticle}
+            className="bg-white border border-[#D8D5CA] rounded-xl p-6 sm:p-10 space-y-8 shadow-sm"
+          >
+            <div className="flex items-center justify-between pb-6 border-b border-[#D8D5CA]">
+              <div>
+                <h2 className="font-serif text-2xl sm:text-3xl font-semibold text-[#151A18]">
+                  {isCreatingArticle ? 'Write New Journal Article' : `Editing: ${editingArticle.title}`}
+                </h2>
+                <p className="text-xs text-[#151A18]/60 mt-1">
+                  Updates immediately on the /journal page.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingArticle(null)}
+                className="p-2 rounded-full border border-[#D8D5CA] hover:bg-[#F6F5F0]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                  Article Title *
+                </label>
+                <input
+                  required
+                  type="text"
+                  value={editingArticle.title}
+                  onChange={(e) => setEditingArticle({ ...editingArticle, title: e.target.value })}
+                  placeholder="e.g. Packing for Concordia"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                  Category
+                </label>
+                <input
+                  type="text"
+                  value={editingArticle.category}
+                  onChange={(e) =>
+                    setEditingArticle({ ...editingArticle, category: e.target.value })
+                  }
+                  placeholder="e.g. Training & Fitness"
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                  Author
+                </label>
+                <input
+                  type="text"
+                  value={editingArticle.author}
+                  onChange={(e) => setEditingArticle({ ...editingArticle, author: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                    Date
+                  </label>
+                  <input
+                    type="text"
+                    value={editingArticle.date}
+                    onChange={(e) => setEditingArticle({ ...editingArticle, date: e.target.value })}
+                    className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                    Read Time
+                  </label>
+                  <input
+                    type="text"
+                    value={editingArticle.readTime}
+                    onChange={(e) =>
+                      setEditingArticle({ ...editingArticle, readTime: e.target.value })
+                    }
+                    className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                Cover Image URL
+              </label>
+              <input
+                type="url"
+                value={editingArticle.coverImage}
+                onChange={(e) =>
+                  setEditingArticle({ ...editingArticle, coverImage: e.target.value })
+                }
+                className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
+                Short Excerpt
+              </label>
+              <textarea
+                rows={2}
+                value={editingArticle.excerpt}
+                onChange={(e) => setEditingArticle({ ...editingArticle, excerpt: e.target.value })}
+                className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+              />
+            </div>
+
+            {/* Article Paragraphs */}
+            <div className="space-y-4 pt-4 border-t border-[#D8D5CA]">
+              <div className="flex items-center justify-between">
+                <h3 className="font-serif text-xl font-semibold text-[#151A18]">
+                  Article Paragraphs
+                </h3>
+                <button
+                  type="button"
+                  onClick={addArticleParagraph}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#142C25] text-white text-xs font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#C5A46D]" />
+                  <span>Add Paragraph</span>
+                </button>
+              </div>
+
+              {(editingArticle.content || []).map((para, idx) => (
+                <div key={idx} className="flex items-start gap-3">
+                  <textarea
+                    rows={3}
+                    value={para}
+                    onChange={(e) => updateArticleParagraph(idx, e.target.value)}
+                    placeholder={`Paragraph ${idx + 1}...`}
+                    className="flex-1 px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeArticleParagraph(idx)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg mt-1"
+                    title="Remove Paragraph"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-4 pt-6 border-t border-[#D8D5CA]">
+              <button
+                type="button"
+                onClick={() => setEditingArticle(null)}
+                className="px-6 py-2.5 rounded-full border border-[#D8D5CA] text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 px-8 py-2.5 rounded-full bg-[#142C25] hover:bg-[#151A18] text-white text-sm font-semibold shadow-md"
+              >
+                <Save className="w-4 h-4 text-[#C5A46D]" />
+                <span>Save Article</span>
+              </button>
+            </div>
+          </form>
+        )}
+
         {/* INQUIRIES */}
         {activeTab === 'inquiries' && (
           <div className="space-y-4">
@@ -945,7 +1287,10 @@ export default function AdminPage() {
             </h2>
             <p className="text-sm text-[#151A18]/75 leading-relaxed">
               Your state in <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">TreksContext.jsx</code>{' '}
-              already mirrors Cloud Firestore collections (<code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/treks</code> &amp; <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/inquiries</code>).
+              already mirrors Cloud Firestore collections:{' '}
+              <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/treks</code>,{' '}
+              <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/articles</code>, and{' '}
+              <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/inquiries</code>.
             </p>
           </div>
         )}

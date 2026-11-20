@@ -1,10 +1,12 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { treksData as initialTreks } from '../data/treksData';
+import { journalArticles as initialArticles } from '../data/journalData';
 
 const TreksContext = createContext(null);
 
 const TREKS_STORAGE_KEY = 'ascentk2_treks_v2';
 const INQUIRIES_STORAGE_KEY = 'ascentk2_inquiries_v2';
+const JOURNAL_STORAGE_KEY = 'ascentk2_journal_v1';
 const CURRENCY_STORAGE_KEY = 'ascentk2_currency_v1';
 
 export const CURRENCY_RATES = {
@@ -69,6 +71,15 @@ export function TreksProvider({ children }) {
     }
   });
 
+  const [articles, setArticles] = useState(() => {
+    try {
+      const saved = localStorage.getItem(JOURNAL_STORAGE_KEY);
+      return saved ? JSON.parse(saved) : initialArticles;
+    } catch {
+      return initialArticles;
+    }
+  });
+
   const [inquiries, setInquiries] = useState(() => {
     try {
       const saved = localStorage.getItem(INQUIRIES_STORAGE_KEY);
@@ -92,6 +103,10 @@ export function TreksProvider({ children }) {
   }, [treks]);
 
   useEffect(() => {
+    localStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(articles));
+  }, [articles]);
+
+  useEffect(() => {
     localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
   }, [inquiries]);
 
@@ -105,6 +120,7 @@ export function TreksProvider({ children }) {
     return `${info.symbol}${converted.toLocaleString()}`;
   };
 
+  // Trek CRUD
   const addTrek = (newTrek) => {
     const slug =
       newTrek.slug?.trim() ||
@@ -117,22 +133,51 @@ export function TreksProvider({ children }) {
       ...newTrek,
       id: Date.now(),
       slug,
-      departures: newTrek.departures?.length ? newTrek.departures : defaultDeparturesForTrek({ ...newTrek, slug }),
+      departures: newTrek.departures?.length
+        ? newTrek.departures
+        : defaultDeparturesForTrek({ ...newTrek, slug }),
     };
     setTreks((prev) => [trekObj, ...prev]);
     return trekObj;
   };
 
   const updateTrek = (id, updatedFields) => {
-    setTreks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t))
-    );
+    setTreks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t)));
   };
 
   const deleteTrek = (id) => {
     setTreks((prev) => prev.filter((t) => t.id !== id));
   };
 
+  // Journal CRUD
+  const addArticle = (newArticle) => {
+    const slug =
+      newArticle.slug?.trim() ||
+      newArticle.title
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/(^-|-$)/g, '');
+
+    const articleObj = {
+      ...newArticle,
+      id: Date.now(),
+      slug,
+    };
+    setArticles((prev) => [articleObj, ...prev]);
+    return articleObj;
+  };
+
+  const updateArticle = (id, updatedFields) => {
+    setArticles((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updatedFields } : a))
+    );
+  };
+
+  const deleteArticle = (id) => {
+    setArticles((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  // Inquiry CRUD
   const addInquiry = (inquiry) => {
     const newItem = {
       ...inquiry,
@@ -156,8 +201,10 @@ export function TreksProvider({ children }) {
 
   const resetDemoData = () => {
     setTreks(enrichedInitialTreks);
+    setArticles(initialArticles);
     setInquiries(defaultInquiries);
     localStorage.removeItem(TREKS_STORAGE_KEY);
+    localStorage.removeItem(JOURNAL_STORAGE_KEY);
     localStorage.removeItem(INQUIRIES_STORAGE_KEY);
   };
 
@@ -165,6 +212,7 @@ export function TreksProvider({ children }) {
     <TreksContext.Provider
       value={{
         treks,
+        articles,
         inquiries,
         currency,
         setCurrency,
@@ -172,6 +220,9 @@ export function TreksProvider({ children }) {
         addTrek,
         updateTrek,
         deleteTrek,
+        addArticle,
+        updateArticle,
+        deleteArticle,
         addInquiry,
         updateInquiryStatus,
         deleteInquiry,
