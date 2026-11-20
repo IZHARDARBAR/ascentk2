@@ -12,23 +12,28 @@ import {
   MapPin,
   Maximize2,
 } from 'lucide-react';
-import { treksData, expeditionsData, testimonialsData } from '../data/treksData';
+import { expeditionsData, testimonialsData } from '../data/treksData';
+import { useTreks } from '../context/TreksContext';
 import TrekCard from '../components/TrekCard';
 import VideoModal from '../components/VideoModal';
 
 export default function HomePage() {
+  const { treks, formatPrice } = useTreks();
   const [videoOpen, setVideoOpen] = useState(false);
-  const featuredTreks = treksData.filter((t) => t.featured);
+
+  const featuredTreks = treks.filter((t) => t.featured);
+  const heroPreviewTreks = featuredTreks.length > 0 ? featuredTreks : treks.slice(0, 3);
   const [heroSlideIndex, setHeroSlideIndex] = useState(0);
 
   useEffect(() => {
+    if (heroPreviewTreks.length === 0) return;
     const timer = setInterval(() => {
-      setHeroSlideIndex((prev) => (prev + 1) % featuredTreks.length);
+      setHeroSlideIndex((prev) => (prev + 1) % heroPreviewTreks.length);
     }, 6000);
     return () => clearInterval(timer);
-  }, [featuredTreks.length]);
+  }, [heroPreviewTreks.length]);
 
-  const activeHeroTrek = featuredTreks[heroSlideIndex] || featuredTreks[0];
+  const activeHeroTrek = heroPreviewTreks[heroSlideIndex % heroPreviewTreks.length] || treks[0];
 
   return (
     <div className="bg-[#F6F5F0]">
@@ -152,7 +157,6 @@ export default function HomePage() {
             </motion.div>
           </div>
 
-          {/* Bottom Bar: Trust Indicators + Featured Card */}
           <div className="pt-8 flex flex-col lg:flex-row lg:items-end justify-between gap-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -193,72 +197,74 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            {/* Bottom-Right Featured Trek Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.65, delay: 0.38 }}
-              className="hidden sm:block w-full max-w-[290px] bg-[#151A18]/75 backdrop-blur-md border border-white/15 rounded-2xl p-3.5 shadow-2xl"
-            >
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={activeHeroTrek.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Link
-                    to={`/treks/${activeHeroTrek.slug}`}
-                    className="relative block aspect-[16/10] rounded-xl overflow-hidden group"
+            {/* Bottom-Right Floating Featured Trek Card */}
+            {activeHeroTrek && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.65, delay: 0.38 }}
+                className="hidden sm:block w-full max-w-[290px] bg-[#151A18]/75 backdrop-blur-md border border-white/15 rounded-2xl p-3.5 shadow-2xl"
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeHeroTrek.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.3 }}
                   >
-                    <img
-                      src={activeHeroTrek.cardImage}
-                      alt={activeHeroTrek.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                    <span className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#151A18]/70 backdrop-blur text-white flex items-center justify-center group-hover:bg-[#C5A46D] group-hover:text-[#151A18] transition">
-                      <Maximize2 className="w-3.5 h-3.5" />
-                    </span>
-                  </Link>
-
-                  <div className="mt-3 px-0.5">
-                    <Link to={`/treks/${activeHeroTrek.slug}`}>
-                      <h3 className="font-sans text-base font-semibold text-white hover:text-[#C5A46D] transition">
-                        {activeHeroTrek.name}
-                      </h3>
+                    <Link
+                      to={`/treks/${activeHeroTrek.slug}`}
+                      className="relative block aspect-[16/10] rounded-xl overflow-hidden group"
+                    >
+                      <img
+                        src={activeHeroTrek.cardImage}
+                        alt={activeHeroTrek.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                      <span className="absolute top-2.5 right-2.5 w-7 h-7 rounded-full bg-[#151A18]/70 backdrop-blur text-white flex items-center justify-center group-hover:bg-[#C5A46D] group-hover:text-[#151A18] transition">
+                        <Maximize2 className="w-3.5 h-3.5" />
+                      </span>
                     </Link>
-                    <p className="flex items-center gap-1.5 text-[11px] text-white/70 mt-1">
-                      <MapPin className="w-3 h-3 text-[#C5A46D] shrink-0" />
-                      <span className="truncate">{activeHeroTrek.location}</span>
-                    </p>
-                    <p className="text-xs text-white/65 mt-2 line-clamp-2 leading-relaxed">
-                      {activeHeroTrek.tagline}
-                    </p>
-                  </div>
-                </motion.div>
-              </AnimatePresence>
 
-              <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10 px-0.5">
-                <div className="flex items-center gap-1.5">
-                  {featuredTreks.map((t, idx) => (
-                    <button
-                      key={t.id}
-                      aria-label={`Preview ${t.name}`}
-                      onClick={() => setHeroSlideIndex(idx)}
-                      className={`h-1.5 rounded-full transition-all ${
-                        idx === heroSlideIndex
-                          ? 'w-5 bg-[#C5A46D]'
-                          : 'w-1.5 bg-white/30 hover:bg-white/60'
-                      }`}
-                    />
-                  ))}
+                    <div className="mt-3 px-0.5">
+                      <Link to={`/treks/${activeHeroTrek.slug}`}>
+                        <h3 className="font-sans text-base font-semibold text-white hover:text-[#C5A46D] transition">
+                          {activeHeroTrek.name}
+                        </h3>
+                      </Link>
+                      <p className="flex items-center gap-1.5 text-[11px] text-white/70 mt-1">
+                        <MapPin className="w-3 h-3 text-[#C5A46D] shrink-0" />
+                        <span className="truncate">{activeHeroTrek.location}</span>
+                      </p>
+                      <p className="text-xs text-white/65 mt-2 line-clamp-2 leading-relaxed">
+                        {activeHeroTrek.tagline}
+                      </p>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+
+                <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10 px-0.5">
+                  <div className="flex items-center gap-1.5">
+                    {heroPreviewTreks.map((t, idx) => (
+                      <button
+                        key={t.id}
+                        aria-label={`Preview ${t.name}`}
+                        onClick={() => setHeroSlideIndex(idx)}
+                        className={`h-1.5 rounded-full transition-all ${
+                          idx === heroSlideIndex
+                            ? 'w-5 bg-[#C5A46D]'
+                            : 'w-1.5 bg-white/30 hover:bg-white/60'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[11px] font-semibold text-[#C5A46D]">
+                    From {formatPrice(activeHeroTrek.startingPrice)}
+                  </span>
                 </div>
-                <span className="text-[11px] font-semibold text-[#C5A46D]">
-                  From ${activeHeroTrek.startingPrice.toLocaleString()}
-                </span>
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </div>
         </div>
       </section>
@@ -287,13 +293,13 @@ export default function HomePage() {
             to="/treks"
             className="inline-flex items-center gap-2 text-sm font-semibold text-[#142C25] border-b border-[#142C25] pb-1 hover:text-[#C5A46D] hover:border-[#C5A46D] transition self-start md:self-auto"
           >
-            <span>View All 10 Treks</span>
+            <span>View All {treks.length} Treks</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {featuredTreks.map((trek, idx) => (
+          {heroPreviewTreks.map((trek, idx) => (
             <TrekCard key={trek.id} trek={trek} index={idx} />
           ))}
         </div>

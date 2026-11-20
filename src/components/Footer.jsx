@@ -33,7 +33,6 @@ export default function Footer() {
               2010.
             </p>
             <div className="flex items-center gap-3 pt-2">
-              {/* Instagram */}
               <a
                 href="https://instagram.com"
                 target="_blank"
@@ -48,7 +47,6 @@ export default function Footer() {
                 </svg>
               </a>
 
-              {/* Facebook */}
               <a
                 href="https://facebook.com"
                 target="_blank"
@@ -61,7 +59,6 @@ export default function Footer() {
                 </svg>
               </a>
 
-              {/* YouTube */}
               <a
                 href="https://youtube.com"
                 target="_blank"
@@ -105,13 +102,13 @@ export default function Footer() {
               </li>
               <li>
                 <Link to="/treks" className="inline-flex items-center gap-1 text-[#C5A46D] pt-1">
-                  All 10 Treks <ArrowUpRight className="w-3.5 h-3.5" />
+                  All Treks <ArrowUpRight className="w-3.5 h-3.5" />
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Expeditions */}
+          {/* Expeditions & Resources */}
           <div className="lg:col-span-2">
             <h4 className="font-sans text-xs uppercase tracking-[0.2em] text-[#C5A46D] font-semibold mb-5">
               Expeditions
@@ -128,8 +125,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link to="/contact" className="hover:text-[#C5A46D] transition">
-                  Minglik Sar (6,050m)
+                <Link to="/journal" className="hover:text-[#C5A46D] transition">
+                  Expedition Journal
                 </Link>
               </li>
               <li>
@@ -166,7 +163,13 @@ export default function Footer() {
 
         <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/50">
           <p>© {new Date().getFullYear()} AscentK2 Treks. All rights reserved.</p>
-          <p>IFMGA &amp; Alpine Club of Pakistan Registered Operator · Gilgit-Baltistan</p>
+          <div className="flex items-center gap-4">
+            <span>IFMGA &amp; Alpine Club of Pakistan Registered Operator</span>
+            <span>·</span>
+            <Link to="/admin" className="text-[#C5A46D] hover:underline font-medium">
+              Admin Portal
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

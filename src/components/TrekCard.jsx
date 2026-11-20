@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
-import { Clock, ArrowRight, Mountain } from 'lucide-react';
+import { Clock, ArrowRight, Mountain, Calendar } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useTreks } from '../context/TreksContext';
 
 const difficultyColors = {
   Easy: 'bg-[#142C25] text-[#F6F5F0]',
@@ -10,6 +11,9 @@ const difficultyColors = {
 };
 
 export default function TrekCard({ trek, index = 0 }) {
+  const { formatPrice } = useTreks();
+  const nextDeparture = trek.departures?.[0];
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 24 }}
@@ -36,6 +40,12 @@ export default function TrekCard({ trek, index = 0 }) {
             {trek.difficulty}
           </span>
 
+          {nextDeparture && (
+            <span className="absolute top-4 right-4 bg-[#151A18]/80 backdrop-blur-sm text-white text-[10px] font-medium px-2.5 py-1 rounded-sm border border-white/15">
+              {nextDeparture.spotsLeft} Spots Left
+            </span>
+          )}
+
           <div className="absolute bottom-3.5 left-4 right-4 flex items-center gap-1.5 text-xs text-white/90">
             <Mountain className="w-3.5 h-3.5 text-[#C5A46D] shrink-0" />
             <span className="truncate">{trek.maxAltitude}</span>
@@ -59,6 +69,13 @@ export default function TrekCard({ trek, index = 0 }) {
           <p className="mt-2.5 text-sm text-[#151A18]/70 leading-relaxed line-clamp-2">
             {trek.tagline}
           </p>
+
+          {nextDeparture && (
+            <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#142C25] bg-[#F6F5F0] px-2.5 py-1 rounded">
+              <Calendar className="w-3 h-3 text-[#C5A46D]" />
+              <span>Next: {nextDeparture.dates}</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -68,7 +85,7 @@ export default function TrekCard({ trek, index = 0 }) {
             Starting From
           </span>
           <span className="font-serif text-xl font-semibold text-[#142C25]">
-            ${trek.startingPrice.toLocaleString()}
+            {formatPrice(trek.startingPrice)}
           </span>
         </div>
 

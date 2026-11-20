@@ -11,6 +11,10 @@ import {
   ChevronDown,
   ArrowRight,
   ArrowLeft,
+  Download,
+  Backpack,
+  Users,
+  ZoomIn,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -22,20 +26,75 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { AnimatePresence, motion } from 'framer-motion';
-import { treksData, globalFaqs } from '../data/treksData';
+import { globalFaqs } from '../data/treksData';
+import { useTreks } from '../context/TreksContext';
+import LightboxModal from '../components/LightboxModal';
+
+const getGearCategories = (difficulty) => {
+  const baseGear = [
+    {
+      category: 'Layering & Clothing',
+      items: [
+        'Moisture-wicking merino base layers (top & bottom)',
+        'Mid-weight fleece or synthetic insulated jacket',
+        'Waterproof & windproof Gore-Tex shell jacket and pants',
+        'Heavy expedition down jacket (-15°C rated)',
+        'Warm beanie, sun hat, neck gaiter (Buff), and liner gloves',
+      ],
+    },
+    {
+      category: 'Footwear & Trekking',
+      items: [
+        'Broken-in waterproof high-ankle trekking boots',
+        '4–5 pairs merino wool trekking socks + liner socks',
+        'Camp shoes / insulated down booties for evenings',
+        'Adjustable trekking poles with snow/mud baskets',
+      ],
+    },
+    {
+      category: 'Sleeping & Essentials',
+      items: [
+        '-15°C to -20°C four-season down sleeping bag',
+        '45L–55L daypack + 80L waterproof expedition duffel',
+        'Category 4 glacier sunglasses + UV lip balm & SPF 50',
+        'Headlamp with spare batteries & 2x 1L insulated Nalgene bottles',
+      ],
+    },
+  ];
+
+  if (difficulty === 'Hard' || difficulty === 'Extreme') {
+    baseGear.push({
+      category: 'Technical & Glacier Gear',
+      items: [
+        '12-point mountaineering crampons (for Gondogoro La / high passes)',
+        'UIAA climbing helmet, alpine harness, and 2 locking carabiners',
+        'Ascender (Jumar) & Figure-8 descender for fixed snow lines',
+        'Waterproof gaiters & insulated expedition mittens',
+      ],
+    });
+  }
+
+  return baseGear;
+};
 
 export default function TrekDetailPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const trek = treksData.find((t) => t.slug === slug);
+  const { treks, formatPrice } = useTreks();
+
+  const trek = treks.find((t) => t.slug === slug);
 
   const [openDay, setOpenDay] = useState(0);
   const [openFaq, setOpenFaq] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
+  const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [checkedGear, setCheckedGear] = useState({});
 
   useEffect(() => {
     setOpenDay(0);
     setOpenFaq(0);
+    setLightboxIndex(null);
+    setCheckedGear({});
   }, [slug]);
 
   if (!trek) {
@@ -97,7 +156,19 @@ export default function TrekDetailPage() {
     },
   ];
 
-  const chartData = trek.itinerary.map((item) => ({
+  const itineraryList = trek.itinerary || [];
+  const galleryList = trek.gallery || [];
+  const allPhotos = [trek.cardImage, ...galleryList].filter(Boolean);
+  const overviewList = trek.overview || [];
+  const highlightsList = trek.highlights || [];
+  const inclusionsList = trek.inclusions || [];
+  const exclusionsList = trek.exclusions || [];
+  const departuresList = trek.departures || [];
+  const gearCategories = getGearCategories(trek.difficulty);
+  const totalGearItems = gearCategories.reduce((acc, c) => acc + c.items.length, 0);
+  const packedCount = Object.values(checkedGear).filter(Boolean).length;
+
+  const chartData = itineraryList.map((item) => ({
     name: `Day ${item.day}`,
     route: item.route,
     elevation: item.elevationNum,
@@ -113,9 +184,59 @@ export default function TrekDetailPage() {
     }
   };
 
-  const handleInquire = (packageTier = '') => {
-    const note = packageTier ? `&package=${encodeURIComponent(packageTier)}` : '';
+  const handleInquire = (extraNote = '') => {
+    const note = extraNote ? `&package=${encodeURIComponent(extraNote)}` : '';
     navigate(`/contact?interest=${encodeURIComponent(trek.name)}${note}`);
+  };
+
+  const handleDownloadDossier = () => {
+    const lines = [
+      `ASCENTK2 TREKS — EXPEDITION DOSSIER`,
+      `==================================================`,
+      `Trek: ${trek.name}`,
+      `Location: ${trek.location}`,
+      `Duration: ${trek.durationLabel} | Difficulty: ${trek.difficulty}`,
+      `Max Altitude: ${trek.maxAltitude} | Best Season: ${trek.bestSeason}`,
+      `Starting Price: $${trek.startingPrice} USD/person`,
+      ``,
+      `OVERVIEW`,
+      `--------`,
+      ...(overviewList.length ? overviewList : [trek.tagline]),
+      ``,
+      `UPCOMING FIXED DEPARTURES`,
+      `-------------------------`,
+      ...departuresList.map((d) => `- ${d.dates} (${d.status}, ${d.spotsLeft} spots left)`),
+      ``,
+      `DAY-BY-DAY ITINERARY`,
+      `--------------------`,
+      ...itineraryList.map(
+        (d) =>
+          `Day ${d.day}: ${d.route} (${d.elevation}) | ${d.accommodation}\n   ${d.description}`
+      ),
+      ``,
+      `INCLUSIONS`,
+      `----------`,
+      ...inclusionsList.map((i) => `+ ${i}`),
+      ``,
+      `ESSENTIAL PACKING LIST`,
+      `----------------------`,
+      ...gearCategories.flatMap((cat) => [
+        `[${cat.category}]`,
+        ...cat.items.map((item) => `  [ ] ${item}`),
+      ]),
+      ``,
+      `Contact: info@ascentk2treks.com | Main Bazaar, Gilgit, Pakistan`,
+    ];
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${trek.slug}-expedition-dossier.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -123,7 +244,7 @@ export default function TrekDetailPage() {
       {/* TREK HERO */}
       <section className="relative min-h-[75vh] flex items-end bg-[#151A18] text-white pt-32 pb-14">
         <img
-          src={trek.heroImage}
+          src={trek.heroImage || trek.cardImage}
           alt={trek.name}
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -181,18 +302,29 @@ export default function TrekDetailPage() {
               </div>
             </div>
 
-            <div className="bg-[#151A18]/85 backdrop-blur-md border border-white/15 rounded-xl p-6 lg:w-72 shrink-0">
-              <span className="text-xs uppercase tracking-widest text-white/60">Starting Price</span>
-              <div className="font-serif text-4xl font-bold text-[#C5A46D] mt-1">
-                ${trek.startingPrice.toLocaleString()}
-                <span className="text-sm font-sans font-normal text-white/60"> /person</span>
+            <div className="bg-[#151A18]/85 backdrop-blur-md border border-white/15 rounded-xl p-6 lg:w-72 shrink-0 space-y-3">
+              <div>
+                <span className="text-xs uppercase tracking-widest text-white/60">Starting Price</span>
+                <div className="font-serif text-4xl font-bold text-[#C5A46D] mt-1">
+                  {formatPrice(trek.startingPrice)}
+                  <span className="text-sm font-sans font-normal text-white/60"> /person</span>
+                </div>
               </div>
+
               <button
                 onClick={() => handleInquire()}
-                className="mt-5 w-full inline-flex items-center justify-center gap-2 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold py-3 rounded-full transition"
+                className="w-full inline-flex items-center justify-center gap-2 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold py-3 rounded-full transition"
               >
                 <span>Inquire Now</span>
                 <ArrowRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={handleDownloadDossier}
+                className="w-full inline-flex items-center justify-center gap-2 border border-white/25 hover:border-[#C5A46D] text-white text-xs font-semibold py-2.5 rounded-full transition"
+              >
+                <Download className="w-3.5 h-3.5 text-[#C5A46D]" />
+                <span>Download Trip Dossier</span>
               </button>
             </div>
           </div>
@@ -201,10 +333,12 @@ export default function TrekDetailPage() {
 
       {/* STICKY SECTION NAVIGATION */}
       <div className="sticky top-[62px] z-30 bg-white/95 backdrop-blur-md border-b border-[#D8D5CA] shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center gap-6 sm:gap-10 overflow-x-auto">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center gap-6 sm:gap-9 overflow-x-auto">
           {[
             { id: 'overview', label: 'Overview' },
+            { id: 'departures', label: 'Departures' },
             { id: 'itinerary', label: 'Itinerary' },
+            { id: 'gear', label: 'Gear List' },
             { id: 'inclusions', label: 'Inclusions' },
             { id: 'pricing', label: 'Pricing' },
             { id: 'faq', label: 'FAQ' },
@@ -226,7 +360,7 @@ export default function TrekDetailPage() {
 
       {/* CONTENT */}
       <div className="max-w-7xl mx-auto px-6 lg:px-10 space-y-20 pt-14">
-        {/* OVERVIEW */}
+        {/* 1. OVERVIEW + INTERACTIVE LIGHTBOX GALLERY */}
         <section id="overview" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           <div className="lg:col-span-7 space-y-6">
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
@@ -235,45 +369,115 @@ export default function TrekDetailPage() {
             <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18]">
               Expedition Experience
             </h2>
-            {trek.overview.map((paragraph, i) => (
-              <p key={i} className="text-base text-[#151A18]/80 leading-relaxed">
-                {paragraph}
-              </p>
-            ))}
+            {overviewList.length > 0 ? (
+              overviewList.map((paragraph, i) => (
+                <p key={i} className="text-base text-[#151A18]/80 leading-relaxed">
+                  {paragraph}
+                </p>
+              ))
+            ) : (
+              <p className="text-base text-[#151A18]/80 leading-relaxed">{trek.tagline}</p>
+            )}
 
-            <div className="pt-4">
-              <h3 className="font-serif text-xl font-semibold text-[#151A18] mb-4">
-                Key Highlights
-              </h3>
-              <ul className="space-y-3">
-                {trek.highlights.map((hl, i) => (
-                  <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/80">
-                    <Check className="w-4 h-4 text-[#142C25] shrink-0 mt-1" />
-                    <span>{hl}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            {highlightsList.length > 0 && (
+              <div className="pt-4">
+                <h3 className="font-serif text-xl font-semibold text-[#151A18] mb-4">
+                  Key Highlights
+                </h3>
+                <ul className="space-y-3">
+                  {highlightsList.map((hl, i) => (
+                    <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/80">
+                      <Check className="w-4 h-4 text-[#142C25] shrink-0 mt-1" />
+                      <span>{hl}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
 
+          {/* Clickable Lightbox Gallery */}
           <div className="lg:col-span-5 grid grid-cols-2 gap-4">
-            <img
-              src={trek.cardImage}
-              alt={trek.name}
-              className="col-span-2 rounded-lg w-full h-64 object-cover shadow-sm"
-            />
-            {trek.gallery.slice(0, 2).map((img, i) => (
-              <img
+            {allPhotos.slice(0, 3).map((img, i) => (
+              <button
                 key={i}
-                src={img}
-                alt={`${trek.name} view ${i + 1}`}
-                className="rounded-lg w-full h-44 object-cover shadow-sm"
-              />
+                type="button"
+                onClick={() => setLightboxIndex(i)}
+                className={`group relative overflow-hidden rounded-lg shadow-sm text-left ${
+                  i === 0 ? 'col-span-2 h-64' : 'h-44'
+                }`}
+              >
+                <img
+                  src={img}
+                  alt={`${trek.name} gallery ${i + 1}`}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                  <span className="w-10 h-10 rounded-full bg-[#151A18]/80 text-white flex items-center justify-center">
+                    <ZoomIn className="w-4 h-4" />
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         </section>
 
-        {/* ELEVATION PROFILE & ITINERARY */}
+        {/* 2. FIXED GROUP DEPARTURES CALENDAR */}
+        <section id="departures" className="pt-6 border-t border-[#D8D5CA]">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
+                Join a Small Group
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
+                Upcoming Group Departures
+              </h2>
+            </div>
+            <span className="text-xs font-medium text-[#142C25] bg-white border border-[#D8D5CA] px-4 py-2 rounded-full">
+              Solo travelers welcome · No forced single supplement
+            </span>
+          </div>
+
+          <div className="space-y-3">
+            {departuresList.map((dep) => (
+              <div
+                key={dep.id}
+                className="bg-white border border-[#D8D5CA] rounded-xl px-6 py-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-[#142C25] transition"
+              >
+                <div className="flex flex-wrap items-center gap-4 sm:gap-8">
+                  <div className="flex items-center gap-2.5">
+                    <Calendar className="w-4 h-4 text-[#C5A46D]" />
+                    <span className="font-serif text-lg font-semibold text-[#151A18]">
+                      {dep.dates}
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-[#151A18]/65">{dep.window}</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#142C25] bg-[#F6F5F0] px-3 py-1 rounded-full">
+                    <Users className="w-3.5 h-3.5 text-[#C5A46D]" />
+                    {dep.spotsLeft} Spots Left
+                  </span>
+                  <span className="px-2.5 py-1 rounded-sm bg-[#142C25] text-[#C5A46D] text-[11px] font-semibold uppercase tracking-wider">
+                    {dep.status} Departure
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between md:justify-end gap-5">
+                  <span className="font-serif text-xl font-bold text-[#142C25]">
+                    {formatPrice(trek.startingPrice)}
+                  </span>
+                  <button
+                    onClick={() => handleInquire(`Departure: ${dep.dates}`)}
+                    className="px-5 py-2.5 rounded-full bg-[#142C25] hover:bg-[#151A18] text-white text-xs font-semibold transition"
+                  >
+                    Reserve Spot
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 3. ELEVATION PROFILE & ITINERARY */}
         <section id="itinerary" className="space-y-12 pt-6 border-t border-[#D8D5CA]">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
@@ -284,60 +488,62 @@ export default function TrekDetailPage() {
             </h2>
           </div>
 
-          <div className="bg-white border border-[#D8D5CA] rounded-xl p-6 shadow-sm">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-[#142C25] mb-6">
-              Altitude Gain Across Expedition (Meters)
-            </h3>
-            <div className="w-full h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="goldElevation" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#C5A46D" stopOpacity={0.5} />
-                      <stop offset="95%" stopColor="#142C25" stopOpacity={0.05} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#D8D5CA" />
-                  <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#151A18' }} />
-                  <YAxis
-                    tick={{ fontSize: 12, fill: '#151A18' }}
-                    unit="m"
-                    domain={[0, 'dataMax + 500']}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#151A18',
-                      borderColor: '#C5A46D',
-                      borderRadius: '8px',
-                      color: '#fff',
-                      fontSize: '12px',
-                    }}
-                    formatter={(value) => [`${value}m`, 'Elevation']}
-                    labelFormatter={(label, payload) =>
-                      payload?.[0]?.payload?.route
-                        ? `${label}: ${payload[0].payload.route}`
-                        : label
-                    }
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="elevation"
-                    stroke="#142C25"
-                    strokeWidth={2.5}
-                    fillOpacity={1}
-                    fill="url(#goldElevation)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          {chartData.length > 0 && (
+            <div className="bg-white border border-[#D8D5CA] rounded-xl p-6 shadow-sm">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-[#142C25] mb-6">
+                Altitude Gain Across Expedition (Meters)
+              </h3>
+              <div className="w-full h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="goldElevation" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#C5A46D" stopOpacity={0.5} />
+                        <stop offset="95%" stopColor="#142C25" stopOpacity={0.05} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#D8D5CA" />
+                    <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#151A18' }} />
+                    <YAxis
+                      tick={{ fontSize: 12, fill: '#151A18' }}
+                      unit="m"
+                      domain={[0, 'dataMax + 500']}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: '#151A18',
+                        borderColor: '#C5A46D',
+                        borderRadius: '8px',
+                        color: '#fff',
+                        fontSize: '12px',
+                      }}
+                      formatter={(value) => [`${value}m`, 'Elevation']}
+                      labelFormatter={(label, payload) =>
+                        payload?.[0]?.payload?.route
+                          ? `${label}: ${payload[0].payload.route}`
+                          : label
+                      }
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="elevation"
+                      stroke="#142C25"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#goldElevation)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-3">
-            {trek.itinerary.map((dayItem, idx) => {
+            {itineraryList.map((dayItem, idx) => {
               const isOpen = openDay === idx;
               return (
                 <div
-                  key={dayItem.day}
+                  key={`${dayItem.day}-${idx}`}
                   className="bg-white border border-[#D8D5CA] rounded-lg overflow-hidden"
                 >
                   <button
@@ -392,7 +598,76 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* INCLUSIONS & EXCLUSIONS */}
+        {/* 4. GEAR & PACKING CHECKLIST + DOSSIER DOWNLOAD */}
+        <section id="gear" className="pt-6 border-t border-[#D8D5CA] space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
+                Preparation Checklist
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
+                Gear &amp; Packing List
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#142C25] bg-white border border-[#D8D5CA] px-4 py-2.5 rounded-full">
+                <Backpack className="w-4 h-4 text-[#C5A46D]" />
+                <span>
+                  {packedCount} / {totalGearItems} Items Packed
+                </span>
+              </div>
+              <button
+                onClick={handleDownloadDossier}
+                className="inline-flex items-center gap-2 bg-[#142C25] hover:bg-[#151A18] text-white text-xs font-semibold px-5 py-2.5 rounded-full transition"
+              >
+                <Download className="w-4 h-4 text-[#C5A46D]" />
+                <span>Download Trip Dossier</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {gearCategories.map((group) => (
+              <div
+                key={group.category}
+                className="bg-white border border-[#D8D5CA] rounded-xl p-6 space-y-4"
+              >
+                <h3 className="font-serif text-xl font-semibold text-[#142C25]">
+                  {group.category}
+                </h3>
+                <ul className="space-y-3">
+                  {group.items.map((item) => {
+                    const checked = Boolean(checkedGear[item]);
+                    return (
+                      <li key={item}>
+                        <label className="flex items-start gap-3 cursor-pointer text-sm">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() =>
+                              setCheckedGear((prev) => ({ ...prev, [item]: !prev[item] }))
+                            }
+                            className="mt-1 w-4 h-4 accent-[#142C25] rounded"
+                          />
+                          <span
+                            className={
+                              checked ? 'line-through text-[#151A18]/45' : 'text-[#151A18]/85'
+                            }
+                          >
+                            {item}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* 5. INCLUSIONS & EXCLUSIONS */}
         <section id="inclusions" className="pt-6 border-t border-[#D8D5CA]">
           <div className="mb-10">
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
@@ -409,7 +684,7 @@ export default function TrekDetailPage() {
                 Included in Your Expedition
               </h3>
               <ul className="space-y-4">
-                {trek.inclusions.map((inc, i) => (
+                {inclusionsList.map((inc, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/85">
                     <span className="w-5 h-5 rounded-full bg-[#142C25] text-white flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3 h-3" />
@@ -425,7 +700,7 @@ export default function TrekDetailPage() {
                 Not Included
               </h3>
               <ul className="space-y-4">
-                {trek.exclusions.map((exc, i) => (
+                {exclusionsList.map((exc, i) => (
                   <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/75">
                     <span className="w-5 h-5 rounded-full bg-[#D8D5CA] text-[#151A18] flex items-center justify-center shrink-0 mt-0.5">
                       <X className="w-3 h-3" />
@@ -438,7 +713,7 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* PRICING PACKAGES */}
+        {/* 6. PRICING PACKAGES */}
         <section id="pricing" className="pt-6 border-t border-[#D8D5CA]">
           <div className="mb-10">
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
@@ -477,7 +752,7 @@ export default function TrekDetailPage() {
 
                   <div className="mt-4">
                     <span className="font-serif text-4xl font-bold">
-                      ${pkg.price.toLocaleString()}
+                      {formatPrice(pkg.price)}
                     </span>
                     <span className={`text-sm ${pkg.popular ? 'text-white/70' : 'text-[#151A18]/60'}`}>
                       /person
@@ -518,7 +793,7 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* FAQ ACCORDION */}
+        {/* 7. FAQ ACCORDION */}
         <section id="faq" className="pt-6 border-t border-[#D8D5CA]">
           <div className="mb-10">
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
@@ -582,7 +857,7 @@ export default function TrekDetailPage() {
             </span>
             <div className="flex items-baseline gap-2">
               <span className="font-serif text-xl sm:text-2xl font-bold text-[#C5A46D]">
-                From ${trek.startingPrice.toLocaleString()}
+                From {formatPrice(trek.startingPrice)}
               </span>
               <span className="text-xs text-white/70">· {trek.durationLabel}</span>
             </div>
@@ -597,6 +872,14 @@ export default function TrekDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* PHOTO LIGHTBOX MODAL */}
+      <LightboxModal
+        images={allPhotos}
+        currentIndex={lightboxIndex}
+        onClose={() => setLightboxIndex(null)}
+        onChangeIndex={setLightboxIndex}
+      />
     </div>
   );
 }

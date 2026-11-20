@@ -10,6 +10,7 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { useTreks } from '../context/TreksContext';
 
 const interestedOptions = [
   'K2 Base Camp Trek',
@@ -23,6 +24,7 @@ const interestedOptions = [
 
 export default function ContactPage() {
   const [searchParams] = useSearchParams();
+  const { addInquiry } = useTreks();
 
   const [form, setForm] = useState({
     fullName: '',
@@ -70,6 +72,7 @@ export default function ContactPage() {
     const validationErrors = validate();
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length === 0) {
+      addInquiry(form);
       setValidatedData({ ...form });
     }
   };
@@ -113,11 +116,11 @@ export default function ContactPage() {
                   <CheckCircle2 className="w-7 h-7 text-[#142C25] shrink-0 mt-0.5" />
                   <div>
                     <h2 className="font-serif text-2xl font-semibold">
-                      Your Inquiry Is Ready to Send
+                      Saved to Admin Inbox &amp; Ready to Send
                     </h2>
                     <p className="text-sm text-[#151A18]/75 mt-1">
-                      This frontend preview does not connect to a backend server. Send your
-                      validated message directly via email or WhatsApp below:
+                      Your inquiry is saved locally in the Admin Portal preview (no live backend
+                      server attached yet). You can also send it directly via Email or WhatsApp:
                     </p>
                   </div>
                 </div>

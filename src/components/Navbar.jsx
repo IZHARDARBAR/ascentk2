@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Menu, X } from 'lucide-react';
+import { ArrowRight, ChevronDown, Menu, X, Globe } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTreks, CURRENCY_RATES } from '../context/TreksContext';
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [treksDropdown, setTreksDropdown] = useState(false);
+  const { currency, setCurrency } = useTreks();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -85,12 +87,12 @@ export default function Navbar() {
             </span>
           </Link>
 
-          {/* Center: Top Frosted Dock (Matches Reference Image) */}
+          {/* Center: Top Frosted Dock */}
           <nav
             className={`hidden lg:flex items-center transition-all duration-300 ${
               scrolled || !isHeroDarkPage
                 ? 'gap-7 py-1'
-                : 'bg-[#151A18]/55 backdrop-blur-md border-b border-x border-white/15 px-12 pt-4 pb-4 rounded-b-[28px] shadow-xl gap-7'
+                : 'bg-[#151A18]/55 backdrop-blur-md border-b border-x border-white/15 px-10 pt-4 pb-4 rounded-b-[28px] shadow-xl gap-6'
             }`}
           >
             <NavLink to="/" end className={navLinkClass}>
@@ -163,7 +165,7 @@ export default function Navbar() {
                         to="/treks"
                         className="block px-3.5 py-2 text-xs font-semibold text-[#C5A46D] hover:bg-white/5 rounded-lg transition"
                       >
-                        View All 10 Treks →
+                        View All Treks →
                       </Link>
                     </div>
                   </motion.div>
@@ -179,6 +181,17 @@ export default function Navbar() {
               <span>Expeditions</span>
               <ChevronDown className="w-3.5 h-3.5 opacity-80" />
             </a>
+
+            <NavLink to="/journal" className={navLinkClass}>
+              {({ isActive }) => (
+                <span className="relative">
+                  Journal
+                  {isActive && (
+                    <span className="absolute -bottom-2 left-0 right-0 h-[2px] bg-[#C5A46D] rounded-full" />
+                  )}
+                </span>
+              )}
+            </NavLink>
 
             <NavLink to="/about" className={navLinkClass}>
               {({ isActive }) => (
@@ -203,8 +216,25 @@ export default function Navbar() {
             </NavLink>
           </nav>
 
-          {/* Right: Pill CTA + Mobile Hamburger */}
+          {/* Right: Currency Switcher + Pill CTA + Mobile Hamburger */}
           <div className={`flex items-center gap-3 ${scrolled || !isHeroDarkPage ? '' : 'py-4'}`}>
+            {/* Currency Switcher */}
+            <div className="hidden sm:flex items-center gap-1.5 bg-[#151A18]/65 backdrop-blur-md border border-white/15 rounded-full px-3 py-1.5 text-white text-xs">
+              <Globe className="w-3.5 h-3.5 text-[#C5A46D]" />
+              <select
+                aria-label="Currency"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+              >
+                {Object.keys(CURRENCY_RATES).map((code) => (
+                  <option key={code} value={code} className="bg-[#151A18] text-white">
+                    {code}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <Link
               to="/contact"
               className="hidden sm:inline-flex items-center gap-3 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold text-sm pl-5 pr-1.5 py-1.5 rounded-full transition-all duration-300 shadow-lg group"
@@ -258,7 +288,7 @@ export default function Navbar() {
                   </button>
                 </div>
 
-                <div className="mt-8 flex flex-col gap-4">
+                <div className="mt-6 flex flex-col gap-3">
                   <Link to="/" className="text-lg font-medium py-2 border-b border-white/10 hover:text-[#C5A46D]">
                     Home
                   </Link>
@@ -272,12 +302,35 @@ export default function Navbar() {
                   >
                     Expeditions
                   </a>
+                  <Link to="/journal" className="text-lg font-medium py-2 border-b border-white/10 hover:text-[#C5A46D]">
+                    Journal &amp; Guides
+                  </Link>
                   <Link to="/about" className="text-lg font-medium py-2 border-b border-white/10 hover:text-[#C5A46D]">
                     About Us
                   </Link>
                   <Link to="/contact" className="text-lg font-medium py-2 border-b border-white/10 hover:text-[#C5A46D]">
                     Contact
                   </Link>
+                </div>
+
+                {/* Mobile Currency Selector */}
+                <div className="mt-6 flex items-center justify-between bg-white/10 px-4 py-2.5 rounded-lg">
+                  <span className="text-xs uppercase tracking-wider text-white/75">Currency</span>
+                  <div className="flex gap-1.5">
+                    {Object.keys(CURRENCY_RATES).map((code) => (
+                      <button
+                        key={code}
+                        onClick={() => setCurrency(code)}
+                        className={`px-2 py-1 rounded text-xs font-semibold ${
+                          currency === code
+                            ? 'bg-[#C5A46D] text-[#151A18]'
+                            : 'text-white/75 hover:text-white'
+                        }`}
+                      >
+                        {code}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
