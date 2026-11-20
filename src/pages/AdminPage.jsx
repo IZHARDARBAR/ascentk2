@@ -7,7 +7,7 @@ import {
   Database,
   Plus,
   Trash2,
-  Edit3,
+  Pencil,
   Save,
   X,
   Search,
@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Lock,
   CheckCircle2,
+  Calendar,
 } from 'lucide-react';
 import { useTreks } from '../context/TreksContext';
 
@@ -43,6 +44,15 @@ const emptyTrekTemplate = {
   highlights: [''],
   inclusions: ['Certified local guide & support crew', 'All camping permits & hot meals'],
   exclusions: ['International airfare & visa', 'Travel & evacuation insurance'],
+  departures: [
+    {
+      id: 'dep-1',
+      dates: 'Jul 10 – Jul 20',
+      window: 'Peak Summer',
+      spotsLeft: 5,
+      status: 'Guaranteed',
+    },
+  ],
   itinerary: [
     {
       day: 1,
@@ -67,7 +77,6 @@ export default function AdminPage() {
     resetDemoData,
   } = useTreks();
 
-  // Frontend-only demo gate (replace with Firebase Auth later)
   const [unlocked, setUnlocked] = useState(false);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -85,11 +94,11 @@ export default function AdminPage() {
 
   const handleUnlock = (e) => {
     e.preventDefault();
-    if (pin === '2025') {
+    if (pin.trim() === '2025') {
       setUnlocked(true);
       setPinError('');
     } else {
-      setPinError('Invalid demo PIN. Use 2025 for frontend preview.');
+      setPinError('Invalid demo PIN. Enter 2025 to unlock.');
     }
   };
 
@@ -100,7 +109,14 @@ export default function AdminPage() {
 
   const openEditForm = (trek) => {
     setIsCreating(false);
-    setEditingTrek(JSON.parse(JSON.stringify(trek)));
+    const cloned = JSON.parse(JSON.stringify(trek));
+    if (!cloned.departures) cloned.departures = [];
+    if (!cloned.overview) cloned.overview = [''];
+    if (!cloned.highlights) cloned.highlights = [''];
+    if (!cloned.inclusions) cloned.inclusions = [''];
+    if (!cloned.exclusions) cloned.exclusions = [''];
+    if (!cloned.itinerary) cloned.itinerary = [];
+    setEditingTrek(cloned);
   };
 
   const handleSaveTrek = (e) => {
@@ -112,11 +128,15 @@ export default function AdminPage() {
       durationDays: Number(editingTrek.durationDays) || 1,
       durationLabel: `${Number(editingTrek.durationDays) || 1} Days`,
       startingPrice: Number(editingTrek.startingPrice) || 0,
-      overview: editingTrek.overview.filter((p) => p.trim() !== ''),
-      highlights: editingTrek.highlights.filter((h) => h.trim() !== ''),
-      inclusions: editingTrek.inclusions.filter((i) => i.trim() !== ''),
-      exclusions: editingTrek.exclusions.filter((ex) => ex.trim() !== ''),
-      itinerary: editingTrek.itinerary.map((item) => ({
+      overview: (editingTrek.overview || []).filter((p) => p.trim() !== ''),
+      highlights: (editingTrek.highlights || []).filter((h) => h.trim() !== ''),
+      inclusions: (editingTrek.inclusions || []).filter((i) => i.trim() !== ''),
+      exclusions: (editingTrek.exclusions || []).filter((ex) => ex.trim() !== ''),
+      departures: (editingTrek.departures || []).map((d) => ({
+        ...d,
+        spotsLeft: Number(d.spotsLeft) || 0,
+      })),
+      itinerary: (editingTrek.itinerary || []).map((item) => ({
         ...item,
         day: Number(item.day) || 1,
         elevationNum: Number(item.elevationNum) || 0,
@@ -133,11 +153,11 @@ export default function AdminPage() {
     setEditingTrek(null);
   };
 
-  // Dynamic Itinerary Handlers
+  // Itinerary handlers
   const addItineraryDay = () => {
     const nextDayNum =
       editingTrek.itinerary.length > 0
-        ? editingTrek.itinerary[editingTrek.itinerary.length - 1].day + 1
+        ? Number(editingTrek.itinerary[editingTrek.itinerary.length - 1].day) + 1
         : 1;
 
     setEditingTrek((prev) => ({
@@ -171,7 +191,39 @@ export default function AdminPage() {
     }));
   };
 
-  // Dynamic String List Handlers (Overview, Highlights, Inclusions, Exclusions)
+  // Departures handlers
+  const addDeparture = () => {
+    setEditingTrek((prev) => ({
+      ...prev,
+      departures: [
+        ...(prev.departures || []),
+        {
+          id: `dep-${Date.now()}`,
+          dates: 'Aug 10 – Aug 22',
+          window: 'Late Summer',
+          spotsLeft: 6,
+          status: 'Available',
+        },
+      ],
+    }));
+  };
+
+  const updateDeparture = (index, field, value) => {
+    setEditingTrek((prev) => {
+      const updated = [...(prev.departures || [])];
+      updated[index] = { ...updated[index], [field]: value };
+      return { ...prev, departures: updated };
+    });
+  };
+
+  const removeDeparture = (index) => {
+    setEditingTrek((prev) => ({
+      ...prev,
+      departures: (prev.departures || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  // String list handlers
   const updateListItem = (listKey, idx, value) => {
     setEditingTrek((prev) => {
       const next = [...prev[listKey]];
@@ -196,14 +248,13 @@ export default function AdminPage() {
 
   const filteredTreks = treks.filter(
     (t) =>
-      t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.location.toLowerCase().includes(searchTerm.toLowerCase())
+      (t.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (t.location || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Demo Gate Screen
   if (!unlocked) {
     return (
-      <div className="min-h-screen bg-[#151A18] flex items-center justify-center px-6 pt-24 pb-16">
+      <div className="min-h-screen bg-[#151A18] flex items-center justify-center px-6 pt-28 pb-16">
         <div className="w-full max-w-md bg-[#142C25] border border-white/15 rounded-2xl p-8 text-white shadow-2xl">
           <div className="w-12 h-12 rounded-full bg-[#C5A46D]/20 text-[#C5A46D] flex items-center justify-center mb-5">
             <Lock className="w-5 h-5" />
@@ -212,7 +263,7 @@ export default function AdminPage() {
           <p className="text-sm text-white/70 mt-2 leading-relaxed">
             Frontend preview mode (localStorage). Enter demo PIN{' '}
             <span className="text-[#C5A46D] font-semibold">2025</span> to manage treks,
-            itineraries, and inquiries. Replace this with Firebase Auth in production.
+            itineraries, departures, and inquiries.
           </p>
 
           <form onSubmit={handleUnlock} className="mt-6 space-y-4">
@@ -237,8 +288,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F5F0] pt-24 pb-20">
-      {/* Toast Notification */}
+    <div className="min-h-screen bg-[#F6F5F0] pt-28 pb-20">
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 bg-[#142C25] text-white border border-[#C5A46D] px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 text-sm font-medium">
           <CheckCircle2 className="w-4 h-4 text-[#C5A46D]" />
@@ -285,7 +335,7 @@ export default function AdminPage() {
             { id: 'overview', label: 'Overview', icon: LayoutDashboard },
             { id: 'treks', label: `Treks & Itineraries (${treks.length})`, icon: Mountain },
             { id: 'inquiries', label: `Inquiries (${inquiries.length})`, icon: Inbox },
-            { id: 'firebase', label: 'Firebase Ready Schema', icon: Database },
+            { id: 'firebase', label: 'Firebase Schema', icon: Database },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -305,37 +355,25 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* =====================================================
-            TAB 1: OVERVIEW STATS
-           ===================================================== */}
+        {/* OVERVIEW */}
         {activeTab === 'overview' && !editingTrek && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
               <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Total Treks</span>
-              <div className="font-serif text-4xl font-bold text-[#142C25] mt-2">
-                {treks.length}
-              </div>
+              <div className="font-serif text-4xl font-bold text-[#142C25] mt-2">{treks.length}</div>
             </div>
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
-              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">
-                Featured on Home
-              </span>
+              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Featured on Home</span>
               <div className="font-serif text-4xl font-bold text-[#C5A46D] mt-2">
                 {treks.filter((t) => t.featured).length}
               </div>
             </div>
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
-              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">
-                Total Inquiries
-              </span>
-              <div className="font-serif text-4xl font-bold text-[#142C25] mt-2">
-                {inquiries.length}
-              </div>
+              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">Total Inquiries</span>
+              <div className="font-serif text-4xl font-bold text-[#142C25] mt-2">{inquiries.length}</div>
             </div>
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6">
-              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">
-                New Leads
-              </span>
+              <span className="text-xs uppercase tracking-wider text-[#151A18]/60">New Leads</span>
               <div className="font-serif text-4xl font-bold text-[#151A18] mt-2">
                 {inquiries.filter((i) => i.status === 'New').length}
               </div>
@@ -343,9 +381,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* =====================================================
-            TAB 2: TREKS LIST OR CREATE/EDIT BUILDER
-           ===================================================== */}
+        {/* TREKS LIST */}
         {activeTab === 'treks' && !editingTrek && (
           <div className="space-y-6">
             <div className="relative max-w-md">
@@ -390,7 +426,7 @@ export default function AdminPage() {
                           {trek.itinerary?.length || 0} Stops
                         </td>
                         <td className="px-6 py-4 font-semibold">
-                          ${trek.startingPrice.toLocaleString()}
+                          ${Number(trek.startingPrice).toLocaleString()}
                         </td>
                         <td className="px-6 py-4">
                           <button
@@ -403,7 +439,6 @@ export default function AdminPage() {
                                 ? 'text-[#C5A46D] bg-[#142C25]'
                                 : 'text-[#151A18]/30 hover:text-[#151A18]'
                             }`}
-                            title="Toggle Featured on Homepage"
                           >
                             <Star className={`w-4 h-4 ${trek.featured ? 'fill-current' : ''}`} />
                           </button>
@@ -422,7 +457,7 @@ export default function AdminPage() {
                               className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#142C25]"
                               title="Edit Trek & Itinerary"
                             >
-                              <Edit3 className="w-4 h-4" />
+                              <Pencil className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => {
@@ -445,9 +480,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* =====================================================
-            CREATE / EDIT TREK & DYNAMIC ITINERARY BUILDER
-           ===================================================== */}
+        {/* CREATE / EDIT TREK & ITINERARY BUILDER */}
         {editingTrek && (
           <form
             onSubmit={handleSaveTrek}
@@ -459,7 +492,7 @@ export default function AdminPage() {
                   {isCreating ? 'Create New Trek & Itinerary' : `Editing: ${editingTrek.name}`}
                 </h2>
                 <p className="text-xs text-[#151A18]/60 mt-1">
-                  Changes immediately sync across Home, All Treks, and Dynamic Trek Detail pages.
+                  Changes sync immediately across Home, All Treks, and Trek Detail pages.
                 </p>
               </div>
               <button
@@ -471,7 +504,6 @@ export default function AdminPage() {
               </button>
             </div>
 
-            {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
@@ -483,7 +515,6 @@ export default function AdminPage() {
                   value={editingTrek.name}
                   onChange={(e) => setEditingTrek({ ...editingTrek, name: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
-                  placeholder="e.g. Baltoro & Concordia Classic"
                 />
               </div>
               <div>
@@ -495,7 +526,6 @@ export default function AdminPage() {
                   value={editingTrek.slug}
                   onChange={(e) => setEditingTrek({ ...editingTrek, slug: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
-                  placeholder="e.g. baltoro-concordia-classic"
                 />
               </div>
               <div>
@@ -518,9 +548,7 @@ export default function AdminPage() {
                   type="number"
                   min="1"
                   value={editingTrek.durationDays}
-                  onChange={(e) =>
-                    setEditingTrek({ ...editingTrek, durationDays: e.target.value })
-                  }
+                  onChange={(e) => setEditingTrek({ ...editingTrek, durationDays: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
                 />
               </div>
@@ -547,9 +575,7 @@ export default function AdminPage() {
                   type="number"
                   min="100"
                   value={editingTrek.startingPrice}
-                  onChange={(e) =>
-                    setEditingTrek({ ...editingTrek, startingPrice: e.target.value })
-                  }
+                  onChange={(e) => setEditingTrek({ ...editingTrek, startingPrice: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
                 />
               </div>
@@ -561,9 +587,7 @@ export default function AdminPage() {
                 <input
                   type="text"
                   value={editingTrek.maxAltitude}
-                  onChange={(e) =>
-                    setEditingTrek({ ...editingTrek, maxAltitude: e.target.value })
-                  }
+                  onChange={(e) => setEditingTrek({ ...editingTrek, maxAltitude: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-lg border border-[#D8D5CA] text-sm"
                 />
               </div>
@@ -587,7 +611,7 @@ export default function AdminPage() {
                   className="w-4 h-4 accent-[#142C25]"
                 />
                 <label htmlFor="featuredCheckbox" className="text-sm font-medium">
-                  Feature on Homepage Hero &amp; Grid
+                  Feature on Homepage
                 </label>
               </div>
             </div>
@@ -606,7 +630,7 @@ export default function AdminPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider mb-2">
-                  Card Image URL (Firebase Storage URL later)
+                  Card Image URL
                 </label>
                 <input
                   type="url"
@@ -617,7 +641,81 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* DYNAMIC DAY-BY-DAY ITINERARY BUILDER */}
+            {/* FIXED GROUP DEPARTURES BUILDER */}
+            <div className="pt-6 border-t border-[#D8D5CA] space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-serif text-2xl font-semibold text-[#151A18] flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-[#C5A46D]" />
+                    <span>Fixed Group Departures</span>
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={addDeparture}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#142C25] text-white text-xs font-semibold"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#C5A46D]" />
+                  <span>Add Departure</span>
+                </button>
+              </div>
+
+              {(editingTrek.departures || []).map((dep, idx) => (
+                <div
+                  key={dep.id || idx}
+                  className="grid grid-cols-1 sm:grid-cols-5 gap-3 p-4 rounded-xl bg-[#F6F5F0] border border-[#D8D5CA] items-end"
+                >
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase mb-1">Dates</label>
+                    <input
+                      type="text"
+                      value={dep.dates}
+                      onChange={(e) => updateDeparture(idx, 'dates', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase mb-1">Season Tag</label>
+                    <input
+                      type="text"
+                      value={dep.window}
+                      onChange={(e) => updateDeparture(idx, 'window', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase mb-1">Spots Left</label>
+                    <input
+                      type="number"
+                      value={dep.spotsLeft}
+                      onChange={(e) => updateDeparture(idx, 'spotsLeft', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold uppercase mb-1">Status</label>
+                    <select
+                      value={dep.status}
+                      onChange={(e) => updateDeparture(idx, 'status', e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
+                    >
+                      <option value="Guaranteed">Guaranteed</option>
+                      <option value="Available">Available</option>
+                      <option value="Filling Fast">Filling Fast</option>
+                    </select>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeDeparture(idx)}
+                    className="px-3 py-2 rounded-lg border border-red-200 text-red-600 text-xs font-semibold hover:bg-red-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* DAY-BY-DAY ITINERARY BUILDER */}
             <div className="pt-6 border-t border-[#D8D5CA] space-y-5">
               <div className="flex items-center justify-between">
                 <div>
@@ -625,7 +723,7 @@ export default function AdminPage() {
                     Day-by-Day Itinerary Builder
                   </h3>
                   <p className="text-xs text-[#151A18]/60">
-                    Elevation numbers automatically generate the Recharts Elevation Profile chart.
+                    Elevation numbers automatically generate the Elevation Profile chart.
                   </p>
                 </div>
                 <button
@@ -659,9 +757,7 @@ export default function AdminPage() {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                       <div>
-                        <label className="block text-[11px] font-semibold uppercase mb-1">
-                          Day #
-                        </label>
+                        <label className="block text-[11px] font-semibold uppercase mb-1">Day #</label>
                         <input
                           type="number"
                           value={dayItem.day}
@@ -670,14 +766,11 @@ export default function AdminPage() {
                         />
                       </div>
                       <div className="lg:col-span-2">
-                        <label className="block text-[11px] font-semibold uppercase mb-1">
-                          Route Title
-                        </label>
+                        <label className="block text-[11px] font-semibold uppercase mb-1">Route Title</label>
                         <input
                           type="text"
                           value={dayItem.route}
                           onChange={(e) => updateItineraryDay(idx, 'route', e.target.value)}
-                          placeholder="e.g. Urdukas to Concordia"
                           className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
                         />
                       </div>
@@ -691,11 +784,7 @@ export default function AdminPage() {
                           onChange={(e) => {
                             const num = e.target.value;
                             updateItineraryDay(idx, 'elevationNum', num);
-                            updateItineraryDay(
-                              idx,
-                              'elevation',
-                              `${Number(num).toLocaleString()}m`
-                            );
+                            updateItineraryDay(idx, 'elevation', `${Number(num).toLocaleString()}m`);
                           }}
                           className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
                         />
@@ -707,9 +796,7 @@ export default function AdminPage() {
                         <input
                           type="text"
                           value={dayItem.accommodation}
-                          onChange={(e) =>
-                            updateItineraryDay(idx, 'accommodation', e.target.value)
-                          }
+                          onChange={(e) => updateItineraryDay(idx, 'accommodation', e.target.value)}
                           className="w-full px-3 py-2 rounded-lg border border-[#D8D5CA] bg-white text-sm"
                         />
                       </div>
@@ -731,7 +818,7 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Highlights / Inclusions / Exclusions */}
+            {/* HIGHLIGHTS & INCLUSIONS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-[#D8D5CA]">
               {[
                 { key: 'highlights', label: 'Key Highlights' },
@@ -750,7 +837,7 @@ export default function AdminPage() {
                       + Add Item
                     </button>
                   </div>
-                  {editingTrek[section.key].map((val, idx) => (
+                  {(editingTrek[section.key] || []).map((val, idx) => (
                     <div key={idx} className="flex gap-2">
                       <input
                         type="text"
@@ -790,17 +877,12 @@ export default function AdminPage() {
           </form>
         )}
 
-        {/* =====================================================
-            TAB 3: INQUIRIES & LEADS INBOX
-           ===================================================== */}
+        {/* INQUIRIES */}
         {activeTab === 'inquiries' && (
           <div className="space-y-4">
             {inquiries.length === 0 ? (
               <div className="bg-white border border-[#D8D5CA] rounded-xl p-12 text-center">
                 <p className="font-serif text-2xl text-[#151A18]">No inquiries yet.</p>
-                <p className="text-sm text-[#151A18]/60 mt-1">
-                  Submit a test inquiry from the Contact page to see it here.
-                </p>
               </div>
             ) : (
               inquiries.map((inq) => (
@@ -855,35 +937,16 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* =====================================================
-            TAB 4: FIREBASE INTEGRATION BLUEPRINT
-           ===================================================== */}
+        {/* FIREBASE BLUEPRINT */}
         {activeTab === 'firebase' && (
           <div className="bg-white border border-[#D8D5CA] rounded-xl p-8 space-y-5">
             <h2 className="font-serif text-2xl font-semibold text-[#151A18]">
               Ready for Firebase Migration
             </h2>
             <p className="text-sm text-[#151A18]/75 leading-relaxed">
-              Your frontend state in <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">TreksContext.jsx</code>{' '}
-              already uses the exact document schema needed for Cloud Firestore:
+              Your state in <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">TreksContext.jsx</code>{' '}
+              already mirrors Cloud Firestore collections (<code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/treks</code> &amp; <code className="bg-[#F6F5F0] px-1.5 py-0.5 rounded">/inquiries</code>).
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-              <div className="p-5 rounded-lg bg-[#151A18] text-white/90 font-mono space-y-1">
-                <div className="text-[#C5A46D] font-bold mb-2">Collection: /treks/{'{slug}'}</div>
-                <div>name, slug, tagline, durationDays</div>
-                <div>difficulty, maxAltitude, location, bestSeason</div>
-                <div>startingPrice, featured, heroImage, cardImage</div>
-                <div>itinerary: [&#123; day, route, elevationNum, ... &#125;]</div>
-                <div>inclusions: [...], exclusions: [...]</div>
-              </div>
-              <div className="p-5 rounded-lg bg-[#151A18] text-white/90 font-mono space-y-1">
-                <div className="text-[#C5A46D] font-bold mb-2">Collection: /inquiries/{'{id}'}</div>
-                <div>fullName, email, phone</div>
-                <div>interestedIn, message</div>
-                <div>status: &quot;New&quot; | &quot;Contacted&quot; | &quot;Booked&quot;</div>
-                <div>createdAt: serverTimestamp()</div>
-              </div>
-            </div>
           </div>
         )}
       </div>
