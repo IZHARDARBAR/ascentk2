@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Mountain,
   Inbox,
-  Database,
   BookOpen,
   Compass,
   Plus,
@@ -90,11 +89,9 @@ export default function AdminPage() {
     trailStatuses,
     adminUser,
     authLoading,
-    dbSynced,
     loginAdmin,
     logoutAdmin,
     uploadImage,
-    seedDefaultDataToFirestore,
     updateTrailStatus,
     addTrek,
     updateTrek,
@@ -152,23 +149,11 @@ export default function AdminPage() {
       setUploadingField(folder);
       const url = await uploadImage(file, folder);
       onSuccess(url);
-      showToast('Photo uploaded to Firebase Storage!');
+      showToast('Photo uploaded successfully!');
     } catch (err) {
       showToast('Upload failed: ' + err.message);
     } finally {
       setUploadingField('');
-    }
-  };
-
-  const handleSeedCloud = async () => {
-    try {
-      setSaving(true);
-      await seedDefaultDataToFirestore();
-      showToast('All 10 default treks, journal & trails synced to Firestore!');
-    } catch (err) {
-      showToast('Seed error: ' + err.message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -398,7 +383,6 @@ export default function AdminPage() {
       (t.location || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Loading Screen
   if (authLoading) {
     return (
       <div className="min-h-screen bg-[#151A18] flex items-center justify-center text-white">
@@ -409,7 +393,6 @@ export default function AdminPage() {
     );
   }
 
-  // Firebase Config Warning / Real Login Gate
   if (!adminUser) {
     return (
       <div className="min-h-screen bg-[#151A18] flex items-center justify-center px-6 pt-28 pb-16">
@@ -440,7 +423,7 @@ export default function AdminPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="your Email"
+                placeholder="your email"
                 className="w-full px-4 py-3 rounded-lg bg-[#151A18] border border-white/20 text-white text-sm focus:outline-none focus:border-[#C5A46D]"
               />
             </div>
@@ -485,7 +468,7 @@ export default function AdminPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-8 border-b border-[#D8D5CA]">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
-              Signed in as {adminUser.email} · {dbSynced ? 'Firestore Live' : 'Local Fallback'}
+              Signed in as {adminUser.email}
             </span>
             <h1 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-1">
               Admin Dashboard
@@ -493,16 +476,6 @@ export default function AdminPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {!dbSynced && (
-              <button
-                onClick={handleSeedCloud}
-                disabled={saving}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#142C25] bg-[#142C25]/10 text-xs font-semibold text-[#142C25] hover:bg-[#142C25] hover:text-white transition"
-              >
-                <Database className="w-3.5 h-3.5" />
-                <span>Seed Default Data to Firestore</span>
-              </button>
-            )}
             <button
               onClick={openCreateArticle}
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] text-sm font-semibold transition shadow-sm"
@@ -608,66 +581,74 @@ export default function AdminPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#D8D5CA]/60">
-                    {filteredTreks.map((trek) => (
-                      <tr key={trek.id} className="hover:bg-[#F6F5F0]/50">
-                        <td className="px-6 py-4">
-                          <div className="font-semibold text-[#151A18]">{trek.name}</div>
-                          <div className="text-xs text-[#151A18]/60">{trek.location}</div>
-                        </td>
-                        <td className="px-6 py-4">{trek.durationLabel}</td>
-                        <td className="px-6 py-4">
-                          <span className="px-2.5 py-1 rounded-sm text-xs font-medium bg-[#F6F5F0] border border-[#D8D5CA]">
-                            {trek.difficulty}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-[#142C25] font-medium">
-                          {trek.itinerary?.length || 0} Stops
-                        </td>
-                        <td className="px-6 py-4 font-semibold">
-                          ${Number(trek.startingPrice).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4">
-                          <button
-                            onClick={async () => {
-                              await updateTrek(trek.id, { featured: !trek.featured });
-                              showToast(`Updated featured status for ${trek.name}`);
-                            }}
-                            className={`p-1.5 rounded-full transition ${
-                              trek.featured
-                                ? 'text-[#C5A46D] bg-[#142C25]'
-                                : 'text-[#151A18]/30 hover:text-[#151A18]'
-                            }`}
-                          >
-                            <Star className={`w-4 h-4 ${trek.featured ? 'fill-current' : ''}`} />
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="inline-flex items-center gap-2">
-                            <Link
-                              to={`/treks/${trek.slug}`}
-                              className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#151A18]/75"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Link>
-                            <button
-                              onClick={() => openEditTrek(trek)}
-                              className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#142C25]"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={async () => {
-                                await deleteTrek(trek.id);
-                                showToast(`Deleted ${trek.name}`);
-                              }}
-                              className="p-2 rounded-lg border border-[#D8D5CA] hover:border-red-500 text-red-600"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
+                    {filteredTreks.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="px-6 py-12 text-center text-[#151A18]/60">
+                          No treks found. Click &ldquo;Add New Trek&rdquo; above to create your first expedition.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filteredTreks.map((trek) => (
+                        <tr key={trek.id} className="hover:bg-[#F6F5F0]/50">
+                          <td className="px-6 py-4">
+                            <div className="font-semibold text-[#151A18]">{trek.name}</div>
+                            <div className="text-xs text-[#151A18]/60">{trek.location}</div>
+                          </td>
+                          <td className="px-6 py-4">{trek.durationLabel}</td>
+                          <td className="px-6 py-4">
+                            <span className="px-2.5 py-1 rounded-sm text-xs font-medium bg-[#F6F5F0] border border-[#D8D5CA]">
+                              {trek.difficulty}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-[#142C25] font-medium">
+                            {trek.itinerary?.length || 0} Stops
+                          </td>
+                          <td className="px-6 py-4 font-semibold">
+                            ${Number(trek.startingPrice).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4">
+                            <button
+                              onClick={async () => {
+                                await updateTrek(trek.id, { featured: !trek.featured });
+                                showToast(`Updated featured status for ${trek.name}`);
+                              }}
+                              className={`p-1.5 rounded-full transition ${
+                                trek.featured
+                                  ? 'text-[#C5A46D] bg-[#142C25]'
+                                  : 'text-[#151A18]/30 hover:text-[#151A18]'
+                              }`}
+                            >
+                              <Star className={`w-4 h-4 ${trek.featured ? 'fill-current' : ''}`} />
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="inline-flex items-center gap-2">
+                              <Link
+                                to={`/treks/${trek.slug}`}
+                                className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#151A18]/75"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Link>
+                              <button
+                                onClick={() => openEditTrek(trek)}
+                                className="p-2 rounded-lg border border-[#D8D5CA] hover:border-[#142C25] text-[#142C25]"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  await deleteTrek(trek.id);
+                                  showToast(`Deleted ${trek.name}`);
+                                }}
+                                className="p-2 rounded-lg border border-[#D8D5CA] hover:border-red-500 text-red-600"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -824,10 +805,10 @@ export default function AdminPage() {
               />
             </div>
 
-            {/* IMAGES WITH FIREBASE STORAGE UPLOAD + LIVE PREVIEWS */}
+            {/* IMAGES */}
             <div className="pt-6 border-t border-[#D8D5CA] space-y-6">
               <h3 className="font-serif text-2xl font-semibold text-[#151A18]">
-                Trek Photography (Paste URL or Upload to Firebase Storage)
+                Trek Photography (Paste URL or Upload)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -1152,52 +1133,58 @@ export default function AdminPage() {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {articles.map((article) => (
-                <div
-                  key={article.id}
-                  className="bg-white border border-[#D8D5CA] rounded-xl overflow-hidden flex flex-col justify-between shadow-sm"
-                >
-                  <div>
-                    <img
-                      src={article.coverImage}
-                      alt={article.title}
-                      className="w-full h-44 object-cover"
-                    />
-                    <div className="p-5 space-y-2">
-                      <span className="text-[11px] font-semibold uppercase tracking-widest text-[#C5A46D]">
-                        {article.category} · {article.date}
-                      </span>
-                      <h3 className="font-serif text-xl font-semibold text-[#151A18]">
-                        {article.title}
-                      </h3>
-                      <p className="text-xs text-[#151A18]/70 line-clamp-2">{article.excerpt}</p>
+            {articles.length === 0 ? (
+              <div className="bg-white border border-[#D8D5CA] rounded-xl p-12 text-center">
+                <p className="font-serif text-2xl text-[#151A18]">No journal articles yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {articles.map((article) => (
+                  <div
+                    key={article.id}
+                    className="bg-white border border-[#D8D5CA] rounded-xl overflow-hidden flex flex-col justify-between shadow-sm"
+                  >
+                    <div>
+                      <img
+                        src={article.coverImage}
+                        alt={article.title}
+                        className="w-full h-44 object-cover"
+                      />
+                      <div className="p-5 space-y-2">
+                        <span className="text-[11px] font-semibold uppercase tracking-widest text-[#C5A46D]">
+                          {article.category} · {article.date}
+                        </span>
+                        <h3 className="font-serif text-xl font-semibold text-[#151A18]">
+                          {article.title}
+                        </h3>
+                        <p className="text-xs text-[#151A18]/70 line-clamp-2">{article.excerpt}</p>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="px-5 py-3.5 border-t border-[#D8D5CA]/60 flex items-center justify-between bg-[#F6F5F0]/50">
-                    <span className="text-xs text-[#151A18]/60">{article.readTime}</span>
-                    <div className="inline-flex items-center gap-2">
-                      <button
-                        onClick={() => openEditArticle(article)}
-                        className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-[#142C25] text-[#142C25]"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={async () => {
-                          await deleteArticle(article.id);
-                          showToast(`Removed article: ${article.title}`);
-                        }}
-                        className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-red-500 text-red-600"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="px-5 py-3.5 border-t border-[#D8D5CA]/60 flex items-center justify-between bg-[#F6F5F0]/50">
+                      <span className="text-xs text-[#151A18]/60">{article.readTime}</span>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={() => openEditArticle(article)}
+                          className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-[#142C25] text-[#142C25]"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await deleteArticle(article.id);
+                            showToast(`Removed article: ${article.title}`);
+                          }}
+                          className="p-2 rounded-lg border border-[#D8D5CA] bg-white hover:border-red-500 text-red-600"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1380,7 +1367,7 @@ export default function AdminPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="inline-flex items-center gap-2 px-8 py-2.5 rounded-full bg-[#142C25] hover:bg-[#151A18] text-white text-sm font-semibold shadow-md"
+                className="inline-flex items-center gap-2 px-8 py-2.5 rounded-full bg-[#142C25] hover:bg-[#151A18] disabled:opacity-60 text-white text-sm font-semibold shadow-md"
               >
                 <Save className="w-4 h-4 text-[#C5A46D]" />
                 <span>{saving ? 'Saving...' : 'Save Article'}</span>
