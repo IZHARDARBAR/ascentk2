@@ -1,4 +1,3 @@
-
 export const treksData = [
   {
     id: 1,
@@ -800,36 +799,64 @@ export const expeditionsData = [
     name: 'K2 Expedition (8,611m)',
     altitude: '8,611m',
     duration: '61 Days',
-    price: 'From $55,000',
+    startingPrice: 55000,
     tag: '8,000m Flagship',
+    season: 'June – August',
+    hapRatio: '1:1 Dedicated Balti / Sherpa HAP',
+    oxygen: '5x 4L Bottles + Top-Out Mask & Regulator',
     image:
       'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=85',
     description:
       'Full-service Abruzzi Spur expedition led by multi-time K2 summiteers with 1:1 high-altitude HAP support, fixed-line logistics, and medical base camp team.',
+    camps: [
+      'Base Camp (5,150m) — Godwin-Austen Glacier, heated dining & doctor tent',
+      'Camp I (6,065m) — Exposed snow ridge above Abruzzi approach',
+      'Camp II (6,700m) — Below House’s Chimney rock pitch',
+      'Camp III (7,350m) — Beneath the Black Pyramid & Shoulder',
+      'Camp IV (7,950m) — The Shoulder, launch pad for Bottleneck summit push',
+    ],
   },
   {
     id: 'broad-peak-expedition',
     name: 'Broad Peak Expedition (8,051m)',
     altitude: '8,051m',
     duration: '55 Days',
-    price: 'From $45,000',
+    startingPrice: 45000,
     tag: '8,000m Summit',
+    season: 'June – August',
+    hapRatio: '1:1 High-Altitude Porter Support',
+    oxygen: '4x 4L Bottles + Summit Mask',
     image:
       'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?auto=format&fit=crop&w=1200&q=85',
     description:
       'Karakoram 8,000m objective along the Godwin-Austen Glacier with heated base camp dining, weather forecasting, and high-camp oxygen caches.',
+    camps: [
+      'Base Camp (4,850m) — Across from K2 South Face',
+      'Camp I (5,700m) — Steep fixed-snow ramp above glacier',
+      'Camp II (6,400m) — Protected snow shelf overlooking Concordia',
+      'Camp III (7,100m) — High camp prior to 14-hour col & ridge summit push',
+    ],
   },
   {
     id: 'minglik-sar',
     name: 'Minglik Sar (6,050m)',
     altitude: '6,050m',
     duration: '19 Days',
-    price: 'From $8,500',
+    startingPrice: 8500,
     tag: '6,000m Alpine Peak',
+    season: 'June – September',
+    hapRatio: '1:2 IFMGA Certified Alpine Ratio',
+    oxygen: 'Emergency Medical Oxygen Only',
     image:
       'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?auto=format&fit=crop&w=1200&q=85',
     description:
       'An exhilarating 6,000-meter snow summit rising above Shimshal Pamir, crafted for ambitious trekkers transitioning into Himalayan mountaineering.',
+    camps: [
+      'Shimshal Pass / Shuwart (4,735m) — Acclimatization meadow camp',
+      'Minglik Sar Base Camp (4,950m) — Snowline approach',
+      'High Camp (5,400m) — Glacier moraine & crampon training',
+      'Summit Push (6,050m) — Non-technical snow ridge with sweeping Karakoram views',
+    ],
   },
 ];
 

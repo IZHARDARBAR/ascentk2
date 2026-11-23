@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { MapPin, Phone, Mail, ArrowUpRight } from 'lucide-react';
+import { useTreks } from '../context/TreksContext';
 
 export default function Footer() {
+  const { treks } = useTreks();
+  const topTreks = treks.slice(0, 4);
+
   return (
     <footer className="bg-[#151A18] text-white border-t border-white/10">
       <div className="max-w-7xl mx-auto px-6 lg:px-10 py-16 lg:py-20">
@@ -74,32 +78,19 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Treks */}
+          {/* Dynamic Signature Treks */}
           <div className="lg:col-span-3">
             <h4 className="font-sans text-xs uppercase tracking-[0.2em] text-[#C5A46D] font-semibold mb-5">
               Signature Treks
             </h4>
             <ul className="space-y-3 text-sm text-white/75">
-              <li>
-                <Link to="/treks/k2-base-camp" className="hover:text-[#C5A46D] transition">
-                  K2 Base Camp Trek
-                </Link>
-              </li>
-              <li>
-                <Link to="/treks/shimshal-pass" className="hover:text-[#C5A46D] transition">
-                  Shimshal Pass
-                </Link>
-              </li>
-              <li>
-                <Link to="/treks/karakoram-grand-traverse" className="hover:text-[#C5A46D] transition">
-                  Karakoram Grand Traverse
-                </Link>
-              </li>
-              <li>
-                <Link to="/treks/rash-lake-trek" className="hover:text-[#C5A46D] transition">
-                  Rash Lake Trek
-                </Link>
-              </li>
+              {topTreks.map((t) => (
+                <li key={t.id}>
+                  <Link to={`/treks/${t.slug}`} className="hover:text-[#C5A46D] transition">
+                    {t.name}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link to="/treks" className="inline-flex items-center gap-1 text-[#C5A46D] pt-1">
                   All Treks <ArrowUpRight className="w-3.5 h-3.5" />
@@ -108,7 +99,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Expeditions & Resources */}
+          {/* Expeditions */}
           <div className="lg:col-span-2">
             <h4 className="font-sans text-xs uppercase tracking-[0.2em] text-[#C5A46D] font-semibold mb-5">
               Expeditions
@@ -163,13 +154,7 @@ export default function Footer() {
 
         <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/50">
           <p>© {new Date().getFullYear()} AscentK2 Treks. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <span>IFMGA &amp; Alpine Club of Pakistan Registered Operator</span>
-            <span>·</span>
-            <Link to="/admin" className="text-[#C5A46D] hover:underline font-medium">
-              Admin Portal
-            </Link>
-          </div>
+          <p>IFMGA &amp; Alpine Club of Pakistan Registered Operator · Gilgit-Baltistan</p>
         </div>
       </div>
     </footer>

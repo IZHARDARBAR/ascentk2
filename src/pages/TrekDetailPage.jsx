@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   Clock,
@@ -15,6 +15,12 @@ import {
   Backpack,
   Users,
   ZoomIn,
+  ShieldCheck,
+  Activity,
+  Compass,
+  Calculator,
+  Search,
+  FileText,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -29,6 +35,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { globalFaqs } from '../data/treksData';
 import { useTreks } from '../context/TreksContext';
 import LightboxModal from '../components/LightboxModal';
+import RouteMap from '../components/RouteMap';
+import { openBrandedDossierPDF } from '../utils/dossierPdf';
 
 const getGearCategories = (difficulty) => {
   const baseGear = [
@@ -86,16 +94,74 @@ export default function TrekDetailPage() {
 
   const [openDay, setOpenDay] = useState(0);
   const [openFaq, setOpenFaq] = useState(0);
+  const [faqSearch, setFaqSearch] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [lightboxIndex, setLightboxIndex] = useState(null);
-  const [checkedGear, setCheckedGear] = useState({});
+  const [footerVisible, setFooterVisible] = useState(false);
+
+  // Interactive Trip Cost Calculator State
+  const [calcGroupSize, setCalcGroupSize] = useState('6+');
+  const [addSingleTent, setAddSingleTent] = useState(false);
+  const [addGearRental, setAddGearRental] = useState(false);
+  const [addExtraPorter, setAddExtraPorter] = useState(false);
+
+  const gearStorageKey = `ascentk2_gear_${slug}`;
+  const [checkedGear, setCheckedGear] = useState(() => {
+    try {
+      const saved = localStorage.getItem(gearStorageKey);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    if (trek) {
+      document.title = `${trek.name} (${trek.durationLabel}) | AscentK2 Treks`;
+    } else {
+      document.title = 'Trek Not Found | AscentK2 Treks';
+    }
+  }, [trek]);
 
   useEffect(() => {
     setOpenDay(0);
     setOpenFaq(0);
+    setFaqSearch('');
     setLightboxIndex(null);
-    setCheckedGear({});
-  }, [slug]);
+    try {
+      const saved = localStorage.getItem(gearStorageKey);
+      setCheckedGear(saved ? JSON.parse(saved) : {});
+    } catch {
+      setCheckedGear({});
+    }
+  }, [slug, gearStorageKey]);
+
+  useEffect(() => {
+    localStorage.setItem(gearStorageKey, JSON.stringify(checkedGear));
+  }, [checkedGear, gearStorageKey]);
+
+  useEffect(() => {
+    const footerEl = document.querySelector('footer');
+    if (!footerEl) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setFooterVisible(entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    observer.observe(footerEl);
+    return () => observer.disconnect();
+  }, []);
+
+  const sortedItinerary = useMemo(() => {
+    return [...(trek?.itinerary || [])].sort((a, b) => Number(a.day) - Number(b.day));
+  }, [trek]);
+
+  const filteredFaqs = useMemo(() => {
+    if (!faqSearch.trim()) return globalFaqs;
+    const q = faqSearch.toLowerCase();
+    return globalFaqs.filter(
+      (f) => f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q)
+    );
+  }, [faqSearch]);
 
   if (!trek) {
     return (
@@ -121,6 +187,17 @@ export default function TrekDetailPage() {
     trek.startingPrice === 2800 ? 3500 : Math.round((3500 * ratio) / 50) * 50;
   const privatePrice =
     trek.startingPrice === 2800 ? 5200 : Math.round((5200 * ratio) / 50) * 50;
+
+  // Calculator Total
+  const baseCalcTier =
+    calcGroupSize === '6+'
+      ? standardPrice
+      : calcGroupSize === '4-5'
+      ? premiumPrice
+      : privatePrice;
+  const addOnTotal =
+    (addSingleTent ? 250 : 0) + (addGearRental ? 160 : 0) + (addExtraPorter ? 220 : 0);
+  const calculatedPerPersonUsd = baseCalcTier + addOnTotal;
 
   const pricingPackages = [
     {
@@ -156,7 +233,6 @@ export default function TrekDetailPage() {
     },
   ];
 
-  const itineraryList = trek.itinerary || [];
   const galleryList = trek.gallery || [];
   const allPhotos = [trek.cardImage, ...galleryList].filter(Boolean);
   const overviewList = trek.overview || [];
@@ -168,7 +244,7 @@ export default function TrekDetailPage() {
   const totalGearItems = gearCategories.reduce((acc, c) => acc + c.items.length, 0);
   const packedCount = Object.values(checkedGear).filter(Boolean).length;
 
-  const chartData = itineraryList.map((item) => ({
+  const chartData = sortedItinerary.map((item) => ({
     name: `Day ${item.day}`,
     route: item.route,
     elevation: item.elevationNum,
@@ -189,54 +265,18 @@ export default function TrekDetailPage() {
     navigate(`/contact?interest=${encodeURIComponent(trek.name)}${note}`);
   };
 
-  const handleDownloadDossier = () => {
-    const lines = [
-      `ASCENTK2 TREKS — EXPEDITION DOSSIER`,
-      `==================================================`,
-      `Trek: ${trek.name}`,
-      `Location: ${trek.location}`,
-      `Duration: ${trek.durationLabel} | Difficulty: ${trek.difficulty}`,
-      `Max Altitude: ${trek.maxAltitude} | Best Season: ${trek.bestSeason}`,
-      `Starting Price: $${trek.startingPrice} USD/person`,
-      ``,
-      `OVERVIEW`,
-      `--------`,
-      ...(overviewList.length ? overviewList : [trek.tagline]),
-      ``,
-      `UPCOMING FIXED DEPARTURES`,
-      `-------------------------`,
-      ...departuresList.map((d) => `- ${d.dates} (${d.status}, ${d.spotsLeft} spots left)`),
-      ``,
-      `DAY-BY-DAY ITINERARY`,
-      `--------------------`,
-      ...itineraryList.map(
-        (d) =>
-          `Day ${d.day}: ${d.route} (${d.elevation}) | ${d.accommodation}\n   ${d.description}`
-      ),
-      ``,
-      `INCLUSIONS`,
-      `----------`,
-      ...inclusionsList.map((i) => `+ ${i}`),
-      ``,
-      `ESSENTIAL PACKING LIST`,
-      `----------------------`,
-      ...gearCategories.flatMap((cat) => [
-        `[${cat.category}]`,
-        ...cat.items.map((item) => `  [ ] ${item}`),
-      ]),
-      ``,
-      `Contact: info@ascentk2treks.com | Main Bazaar, Gilgit, Pakistan`,
-    ];
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${trek.slug}-expedition-dossier.txt`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleCustomQuoteBook = () => {
+    const addOns = [
+      addSingleTent && 'Private Single Tent (+$250)',
+      addGearRental && 'Expedition Gear Kit (+$160)',
+      addExtraPorter && 'Extra 15kg Porter (+$220)',
+    ]
+      .filter(Boolean)
+      .join(', ');
+    const summary = `Group: ${calcGroupSize}${addOns ? ` | Add-ons: ${addOns}` : ''} | Estimate: ${formatPrice(
+      calculatedPerPersonUsd
+    )}/person`;
+    handleInquire(summary);
   };
 
   return (
@@ -320,11 +360,18 @@ export default function TrekDetailPage() {
               </button>
 
               <button
-                onClick={handleDownloadDossier}
+                onClick={() =>
+                  openBrandedDossierPDF(
+                    trek,
+                    formatPrice(trek.startingPrice),
+                    sortedItinerary,
+                    gearCategories
+                  )
+                }
                 className="w-full inline-flex items-center justify-center gap-2 border border-white/25 hover:border-[#C5A46D] text-white text-xs font-semibold py-2.5 rounded-full transition"
               >
-                <Download className="w-3.5 h-3.5 text-[#C5A46D]" />
-                <span>Download Trip Dossier</span>
+                <FileText className="w-3.5 h-3.5 text-[#C5A46D]" />
+                <span>Download PDF Brochure</span>
               </button>
             </div>
           </div>
@@ -332,15 +379,15 @@ export default function TrekDetailPage() {
       </section>
 
       {/* STICKY SECTION NAVIGATION */}
-      <div className="sticky top-[62px] z-30 bg-white/95 backdrop-blur-md border-b border-[#D8D5CA] shadow-sm">
+      <div className="sticky top-[58px] sm:top-[62px] z-30 bg-white/95 backdrop-blur-md border-b border-[#D8D5CA] shadow-sm">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 flex items-center gap-6 sm:gap-9 overflow-x-auto">
           {[
             { id: 'overview', label: 'Overview' },
             { id: 'departures', label: 'Departures' },
-            { id: 'itinerary', label: 'Itinerary' },
+            { id: 'itinerary', label: 'Itinerary & Map' },
             { id: 'gear', label: 'Gear List' },
             { id: 'inclusions', label: 'Inclusions' },
-            { id: 'pricing', label: 'Pricing' },
+            { id: 'pricing', label: 'Calculator & Pricing' },
             { id: 'faq', label: 'FAQ' },
           ].map((tab) => (
             <button
@@ -360,69 +407,100 @@ export default function TrekDetailPage() {
 
       {/* CONTENT */}
       <div className="max-w-7xl mx-auto px-6 lg:px-10 space-y-20 pt-14">
-        {/* 1. OVERVIEW + INTERACTIVE LIGHTBOX GALLERY */}
-        <section id="overview" className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-          <div className="lg:col-span-7 space-y-6">
-            <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
-              Route Overview
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18]">
-              Expedition Experience
-            </h2>
-            {overviewList.length > 0 ? (
-              overviewList.map((paragraph, i) => (
-                <p key={i} className="text-base text-[#151A18]/80 leading-relaxed">
-                  {paragraph}
-                </p>
-              ))
-            ) : (
-              <p className="text-base text-[#151A18]/80 leading-relaxed">{trek.tagline}</p>
-            )}
+        {/* 1. OVERVIEW + LIGHTBOX + SAFETY BANNER */}
+        <section id="overview" className="space-y-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            <div className="lg:col-span-7 space-y-6">
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
+                Route Overview
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18]">
+                Expedition Experience
+              </h2>
+              {overviewList.length > 0 ? (
+                overviewList.map((paragraph, i) => (
+                  <p key={i} className="text-base text-[#151A18]/80 leading-relaxed">
+                    {paragraph}
+                  </p>
+                ))
+              ) : (
+                <p className="text-base text-[#151A18]/80 leading-relaxed">{trek.tagline}</p>
+              )}
 
-            {highlightsList.length > 0 && (
-              <div className="pt-4">
-                <h3 className="font-serif text-xl font-semibold text-[#151A18] mb-4">
-                  Key Highlights
-                </h3>
-                <ul className="space-y-3">
-                  {highlightsList.map((hl, i) => (
-                    <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/80">
-                      <Check className="w-4 h-4 text-[#142C25] shrink-0 mt-1" />
-                      <span>{hl}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+              {highlightsList.length > 0 && (
+                <div className="pt-4">
+                  <h3 className="font-serif text-xl font-semibold text-[#151A18] mb-4">
+                    Key Highlights
+                  </h3>
+                  <ul className="space-y-3">
+                    {highlightsList.map((hl, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-[#151A18]/80">
+                        <Check className="w-4 h-4 text-[#142C25] shrink-0 mt-1" />
+                        <span>{hl}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            <div className="lg:col-span-5 grid grid-cols-2 gap-4">
+              {allPhotos.slice(0, 3).map((img, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => setLightboxIndex(i)}
+                  className={`group relative overflow-hidden rounded-lg shadow-sm text-left ${
+                    i === 0 ? 'col-span-2 h-64' : 'h-44'
+                  }`}
+                >
+                  <img
+                    src={img}
+                    alt={`${trek.name} gallery ${i + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <span className="w-10 h-10 rounded-full bg-[#151A18]/80 text-white flex items-center justify-center">
+                      <ZoomIn className="w-4 h-4" />
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Clickable Lightbox Gallery */}
-          <div className="lg:col-span-5 grid grid-cols-2 gap-4">
-            {allPhotos.slice(0, 3).map((img, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => setLightboxIndex(i)}
-                className={`group relative overflow-hidden rounded-lg shadow-sm text-left ${
-                  i === 0 ? 'col-span-2 h-64' : 'h-44'
-                }`}
-              >
-                <img
-                  src={img}
-                  alt={`${trek.name} gallery ${i + 1}`}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                />
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                  <span className="w-10 h-10 rounded-full bg-[#151A18]/80 text-white flex items-center justify-center">
-                    <ZoomIn className="w-4 h-4" />
-                  </span>
-                </div>
-              </button>
-            ))}
+          <div className="bg-[#142C25] text-white rounded-xl p-6 sm:p-8 grid grid-cols-1 md:grid-cols-3 gap-6 border border-[#C5A46D]/30">
+            <div className="flex items-start gap-3.5">
+              <Activity className="w-6 h-6 text-[#C5A46D] shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-serif text-lg font-semibold">Twice-Daily SpO2 Checks</h4>
+                <p className="text-xs text-white/75 mt-1 leading-relaxed">
+                  Pulse oximetry &amp; Lake Louise altitude scoring every morning and evening.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3.5">
+              <ShieldCheck className="w-6 h-6 text-[#C5A46D] shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-serif text-lg font-semibold">Gamow Bag &amp; Medical O2</h4>
+                <p className="text-xs text-white/75 mt-1 leading-relaxed">
+                  Portable hyperbaric chamber &amp; emergency oxygen carried on all high routes.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3.5">
+              <Compass className="w-6 h-6 text-[#C5A46D] shrink-0 mt-0.5" />
+              <div>
+                <h4 className="font-serif text-lg font-semibold">Satellite &amp; Heli Rescue</h4>
+                <p className="text-xs text-white/75 mt-1 leading-relaxed">
+                  Thuraya satellite comms &amp; direct Askari Aviation helicopter evacuation chain.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* 2. FIXED GROUP DEPARTURES CALENDAR */}
+        {/* 2. FIXED GROUP DEPARTURES */}
         <section id="departures" className="pt-6 border-t border-[#D8D5CA]">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
             <div>
@@ -477,18 +555,24 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* 3. ELEVATION PROFILE & ITINERARY */}
-        <section id="itinerary" className="space-y-12 pt-6 border-t border-[#D8D5CA]">
+        {/* 3. ROUTE MAP + ELEVATION PROFILE + ITINERARY */}
+        <section id="itinerary" className="space-y-10 pt-6 border-t border-[#D8D5CA]">
           <div>
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
               Acclimatization &amp; Route
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
-              Elevation Profile &amp; Day-by-Day Itinerary
+              Interactive Route Map &amp; Itinerary
             </h2>
           </div>
 
-          {chartData.length > 0 && (
+          <RouteMap
+            itinerary={sortedItinerary}
+            selectedDayIndex={openDay}
+            onSelectDay={(idx) => setOpenDay(idx)}
+          />
+
+          {chartData.length > 1 && (
             <div className="bg-white border border-[#D8D5CA] rounded-xl p-6 shadow-sm">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-[#142C25] mb-6">
                 Altitude Gain Across Expedition (Meters)
@@ -539,7 +623,7 @@ export default function TrekDetailPage() {
           )}
 
           <div className="space-y-3">
-            {itineraryList.map((dayItem, idx) => {
+            {sortedItinerary.map((dayItem, idx) => {
               const isOpen = openDay === idx;
               return (
                 <div
@@ -598,31 +682,46 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* 4. GEAR & PACKING CHECKLIST + DOSSIER DOWNLOAD */}
+        {/* 4. GEAR & PACKING CHECKLIST */}
         <section id="gear" className="pt-6 border-t border-[#D8D5CA] space-y-8">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
-                Preparation Checklist
+                Saved Automatically in Your Browser
               </span>
               <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
                 Gear &amp; Packing List
               </h2>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-xs font-semibold text-[#142C25] bg-white border border-[#D8D5CA] px-4 py-2.5 rounded-full">
                 <Backpack className="w-4 h-4 text-[#C5A46D]" />
                 <span>
-                  {packedCount} / {totalGearItems} Items Packed
+                  {packedCount} / {totalGearItems} Packed
                 </span>
               </div>
+              {packedCount > 0 && (
+                <button
+                  onClick={() => setCheckedGear({})}
+                  className="text-xs font-semibold text-[#151A18]/70 hover:text-red-600 px-3 py-2"
+                >
+                  Clear List
+                </button>
+              )}
               <button
-                onClick={handleDownloadDossier}
+                onClick={() =>
+                  openBrandedDossierPDF(
+                    trek,
+                    formatPrice(trek.startingPrice),
+                    sortedItinerary,
+                    gearCategories
+                  )
+                }
                 className="inline-flex items-center gap-2 bg-[#142C25] hover:bg-[#151A18] text-white text-xs font-semibold px-5 py-2.5 rounded-full transition"
               >
                 <Download className="w-4 h-4 text-[#C5A46D]" />
-                <span>Download Trip Dossier</span>
+                <span>Download PDF Brochure</span>
               </button>
             </div>
           </div>
@@ -713,17 +812,109 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* 6. PRICING PACKAGES */}
-        <section id="pricing" className="pt-6 border-t border-[#D8D5CA]">
-          <div className="mb-10">
+        {/* 6. INTERACTIVE TRIP COST CALCULATOR + PRICING PACKAGES */}
+        <section id="pricing" className="pt-6 border-t border-[#D8D5CA] space-y-12">
+          <div>
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
-              Departure Tiers
+              Departure Tiers &amp; Custom Quote
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
-              Pricing Packages
+              Pricing &amp; Cost Estimator
             </h2>
           </div>
 
+          {/* Interactive Cost Estimator */}
+          <div className="bg-[#142C25] text-white rounded-2xl p-6 sm:p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center shadow-lg">
+            <div className="lg:col-span-7 space-y-6">
+              <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#C5A46D] font-semibold">
+                <Calculator className="w-4 h-4" />
+                <span>Interactive Trip Cost Calculator</span>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-white/75 mb-2.5">
+                  1. Select Group Size
+                </label>
+                <div className="flex flex-wrap gap-2.5">
+                  {[
+                    { key: '6+', label: 'Group of 6+ (Standard)' },
+                    { key: '4-5', label: 'Group of 4–5 (Premium)' },
+                    { key: '1-2', label: 'Solo or 2 People (Private)' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setCalcGroupSize(opt.key)}
+                      className={`px-4 py-2 rounded-full text-xs font-semibold transition ${
+                        calcGroupSize === opt.key
+                          ? 'bg-[#C5A46D] text-[#151A18]'
+                          : 'bg-white/10 text-white hover:bg-white/20'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs uppercase tracking-wider text-white/75 mb-2.5">
+                  2. Optional Add-Ons
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <label className="flex items-center gap-2.5 bg-white/10 p-3 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addSingleTent}
+                      onChange={(e) => setAddSingleTent(e.target.checked)}
+                      className="accent-[#C5A46D]"
+                    />
+                    <span>Private Tent (+{formatPrice(250)})</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 bg-white/10 p-3 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addGearRental}
+                      onChange={(e) => setAddGearRental(e.target.checked)}
+                      className="accent-[#C5A46D]"
+                    />
+                    <span>Full Gear Rental (+{formatPrice(160)})</span>
+                  </label>
+                  <label className="flex items-center gap-2.5 bg-white/10 p-3 rounded-lg cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={addExtraPorter}
+                      onChange={(e) => setAddExtraPorter(e.target.checked)}
+                      className="accent-[#C5A46D]"
+                    />
+                    <span>Extra 15kg Porter (+{formatPrice(220)})</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-5 bg-[#151A18] rounded-xl p-6 border border-white/15 space-y-4">
+              <span className="text-xs uppercase tracking-widest text-white/60">
+                Estimated Cost Per Person
+              </span>
+              <div className="font-serif text-4xl sm:text-5xl font-bold text-[#C5A46D]">
+                {formatPrice(calculatedPerPersonUsd)}
+              </div>
+              <p className="text-xs text-white/70 leading-relaxed">
+                Includes base expedition ({formatPrice(baseCalcTier)}) + selected upgrades (
+                {formatPrice(addOnTotal)}). Zero hidden permit charges.
+              </p>
+              <button
+                onClick={handleCustomQuoteBook}
+                className="w-full inline-flex items-center justify-center gap-2 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold py-3 rounded-full text-sm transition"
+              >
+                <span>Lock In This Custom Quote</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* 3 Standard Tiers */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {pricingPackages.map((pkg) => (
               <div
@@ -793,19 +984,32 @@ export default function TrekDetailPage() {
           </div>
         </section>
 
-        {/* 7. FAQ ACCORDION */}
+        {/* 7. SEARCHABLE FAQ ACCORDION */}
         <section id="faq" className="pt-6 border-t border-[#D8D5CA]">
-          <div className="mb-10">
-            <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
-              Preparation &amp; Policies
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
-              Frequently Asked Questions
-            </h2>
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10">
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
+                Preparation &amp; Policies
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl font-semibold text-[#151A18] mt-2">
+                Frequently Asked Questions
+              </h2>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-[#151A18]/50 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={faqSearch}
+                onChange={(e) => setFaqSearch(e.target.value)}
+                placeholder="Search permits, gear, season..."
+                className="w-full pl-11 pr-4 py-2.5 bg-white border border-[#D8D5CA] rounded-full text-sm focus:outline-none focus:border-[#142C25]"
+              />
+            </div>
           </div>
 
           <div className="space-y-3 max-w-4xl">
-            {globalFaqs.map((faq, idx) => {
+            {filteredFaqs.map((faq, idx) => {
               const isOpen = openFaq === idx;
               return (
                 <div
@@ -844,36 +1048,48 @@ export default function TrekDetailPage() {
                 </div>
               );
             })}
+            {filteredFaqs.length === 0 && (
+              <p className="text-sm text-[#151A18]/65">No matching FAQ found for &ldquo;{faqSearch}&rdquo;.</p>
+            )}
           </div>
         </section>
       </div>
 
-      {/* STICKY BOOKING CTA */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#151A18]/95 backdrop-blur-md border-t border-white/15 text-white py-3.5 px-5 sm:px-10 shadow-2xl">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div>
-            <span className="hidden sm:block text-[11px] uppercase tracking-wider text-white/60">
-              {trek.name}
-            </span>
-            <div className="flex items-baseline gap-2">
-              <span className="font-serif text-xl sm:text-2xl font-bold text-[#C5A46D]">
-                From {formatPrice(trek.startingPrice)}
-              </span>
-              <span className="text-xs text-white/70">· {trek.durationLabel}</span>
-            </div>
-          </div>
-
-          <button
-            onClick={() => handleInquire()}
-            className="inline-flex items-center gap-2.5 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold text-sm px-6 py-2.5 rounded-full transition"
+      {/* FOOTER-AWARE STICKY BOOKING CTA */}
+      <AnimatePresence>
+        {!footerVisible && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="fixed bottom-0 left-0 right-0 z-40 bg-[#151A18]/95 backdrop-blur-md border-t border-white/15 text-white py-3.5 px-5 sm:px-10 shadow-2xl"
           >
-            <span>Inquire Now</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+            <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+              <div>
+                <span className="hidden sm:block text-[11px] uppercase tracking-wider text-white/60">
+                  {trek.name}
+                </span>
+                <div className="flex items-baseline gap-2">
+                  <span className="font-serif text-xl sm:text-2xl font-bold text-[#C5A46D]">
+                    From {formatPrice(trek.startingPrice)}
+                  </span>
+                  <span className="text-xs text-white/70">· {trek.durationLabel}</span>
+                </div>
+              </div>
 
-      {/* PHOTO LIGHTBOX MODAL */}
+              <button
+                onClick={() => handleInquire()}
+                className="inline-flex items-center gap-2.5 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold text-sm px-6 py-2.5 rounded-full transition"
+              >
+                <span>Inquire Now</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <LightboxModal
         images={allPhotos}
         currentIndex={lightboxIndex}

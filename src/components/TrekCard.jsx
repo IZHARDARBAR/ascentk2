@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Clock, ArrowRight, Mountain, Calendar } from 'lucide-react';
+import { Clock, ArrowRight, Mountain, Calendar, ArrowLeftRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTreks } from '../context/TreksContext';
 
@@ -11,8 +11,9 @@ const difficultyColors = {
 };
 
 export default function TrekCard({ trek, index = 0 }) {
-  const { formatPrice } = useTreks();
+  const { formatPrice, compareIds, toggleCompare } = useTreks();
   const nextDeparture = trek.departures?.[0];
+  const isComparing = compareIds.includes(trek.id);
 
   return (
     <motion.article
@@ -70,12 +71,27 @@ export default function TrekCard({ trek, index = 0 }) {
             {trek.tagline}
           </p>
 
-          {nextDeparture && (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-[11px] font-medium text-[#142C25] bg-[#F6F5F0] px-2.5 py-1 rounded">
-              <Calendar className="w-3 h-3 text-[#C5A46D]" />
-              <span>Next: {nextDeparture.dates}</span>
-            </div>
-          )}
+          <div className="mt-3 flex items-center justify-between gap-2">
+            {nextDeparture && (
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#142C25] bg-[#F6F5F0] px-2.5 py-1 rounded">
+                <Calendar className="w-3 h-3 text-[#C5A46D]" />
+                <span>Next: {nextDeparture.dates}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => toggleCompare(trek.id)}
+              className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded border transition ${
+                isComparing
+                  ? 'bg-[#142C25] text-[#C5A46D] border-[#142C25]'
+                  : 'bg-white text-[#151A18]/65 border-[#D8D5CA] hover:border-[#142C25]'
+              }`}
+            >
+              <ArrowLeftRight className="w-3 h-3" />
+              <span>{isComparing ? 'Added' : 'Compare'}</span>
+            </button>
+          </div>
         </div>
       </div>
 

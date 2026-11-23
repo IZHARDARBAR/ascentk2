@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, ChevronDown, Menu, X, Globe } from 'lucide-react';
+import { ArrowRight, ChevronDown, Menu, X, Globe, Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTreks, CURRENCY_RATES } from '../context/TreksContext';
 
@@ -8,6 +8,9 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [treksDropdown, setTreksDropdown] = useState(false);
+  const [currencyOpen, setCurrencyOpen] = useState(false);
+  const currencyRef = useRef(null);
+
   const { currency, setCurrency } = useTreks();
   const location = useLocation();
   const navigate = useNavigate();
@@ -25,8 +28,19 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (currencyRef.current && !currencyRef.current.contains(e.target)) {
+        setCurrencyOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     setMobileOpen(false);
     setTreksDropdown(false);
+    setCurrencyOpen(false);
   }, [location.pathname]);
 
   const handleExpeditionsClick = (e) => {
@@ -41,7 +55,7 @@ export default function Navbar() {
   };
 
   const navLinkClass = ({ isActive }) =>
-    `relative py-1 text-sm font-medium tracking-wide transition-colors duration-200 ${
+    `relative py-1 text-xs xl:text-sm font-medium tracking-wide whitespace-nowrap transition-colors duration-200 ${
       isActive ? 'text-white' : 'text-white/80 hover:text-white'
     }`;
 
@@ -54,15 +68,17 @@ export default function Navbar() {
             : 'bg-transparent py-0'
         }`}
       >
-        <div className="max-w-[1440px] mx-auto px-5 sm:px-8 lg:px-12 flex items-center justify-between">
+        <div className="max-w-[1440px] mx-auto px-5 sm:px-8 xl:px-12 flex items-center justify-between gap-4">
           {/* Left: Brand Logo */}
           <Link
             to="/"
-            className={`flex items-center gap-3 group ${scrolled || !isHeroDarkPage ? '' : 'py-5'}`}
+            className={`flex items-center gap-2.5 shrink-0 group ${
+              scrolled || !isHeroDarkPage ? '' : 'py-5'
+            }`}
           >
             <svg
-              width="36"
-              height="26"
+              width="34"
+              height="24"
               viewBox="0 0 38 28"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -82,7 +98,7 @@ export default function Navbar() {
                 strokeLinejoin="round"
               />
             </svg>
-            <span className="text-white font-semibold text-lg tracking-tight leading-none">
+            <span className="text-white font-semibold text-base xl:text-lg tracking-tight leading-none whitespace-nowrap">
               AscentK2 <span className="text-[#C5A46D]">Treks</span>
             </span>
           </Link>
@@ -91,8 +107,8 @@ export default function Navbar() {
           <nav
             className={`hidden lg:flex items-center transition-all duration-300 ${
               scrolled || !isHeroDarkPage
-                ? 'gap-7 py-1'
-                : 'bg-[#151A18]/55 backdrop-blur-md border-b border-x border-white/15 px-10 pt-4 pb-4 rounded-b-[28px] shadow-xl gap-6'
+                ? 'gap-4 xl:gap-7 py-1'
+                : 'bg-[#151A18]/55 backdrop-blur-md border-b border-x border-white/15 px-7 xl:px-10 pt-4 pb-4 rounded-b-[28px] shadow-xl gap-4 xl:gap-6'
             }`}
           >
             <NavLink to="/" end className={navLinkClass}>
@@ -114,7 +130,7 @@ export default function Navbar() {
               <NavLink
                 to="/treks"
                 className={({ isActive }) =>
-                  `flex items-center gap-1 py-1 text-sm font-medium tracking-wide transition-colors ${
+                  `flex items-center gap-1 py-1 text-xs xl:text-sm font-medium tracking-wide whitespace-nowrap transition-colors ${
                     isActive ? 'text-white' : 'text-white/80 hover:text-white'
                   }`
                 }
@@ -176,7 +192,7 @@ export default function Navbar() {
             <a
               href="/#expeditions"
               onClick={handleExpeditionsClick}
-              className="flex items-center gap-1 py-1 text-sm font-medium tracking-wide text-white/80 hover:text-white transition-colors"
+              className="flex items-center gap-1 py-1 text-xs xl:text-sm font-medium tracking-wide whitespace-nowrap text-white/80 hover:text-white transition-colors"
             >
               <span>Expeditions</span>
               <ChevronDown className="w-3.5 h-3.5 opacity-80" />
@@ -216,32 +232,68 @@ export default function Navbar() {
             </NavLink>
           </nav>
 
-          {/* Right: Currency Switcher + Pill CTA + Mobile Hamburger */}
-          <div className={`flex items-center gap-3 ${scrolled || !isHeroDarkPage ? '' : 'py-4'}`}>
-            {/* Currency Switcher */}
-            <div className="hidden sm:flex items-center gap-1.5 bg-[#151A18]/65 backdrop-blur-md border border-white/15 rounded-full px-3 py-1.5 text-white text-xs">
-              <Globe className="w-3.5 h-3.5 text-[#C5A46D]" />
-              <select
-                aria-label="Currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer"
+          {/* Right: Custom Currency Pill + Plan Your Trek CTA */}
+          <div className={`flex items-center gap-2.5 shrink-0 ${scrolled || !isHeroDarkPage ? '' : 'py-4'}`}>
+            {/* Custom Sleek Currency Switcher */}
+            <div ref={currencyRef} className="relative hidden sm:block">
+              <button
+                type="button"
+                onClick={() => setCurrencyOpen((o) => !o)}
+                className="inline-flex items-center gap-1.5 bg-[#151A18]/75 hover:bg-[#151A18] backdrop-blur-md border border-white/20 hover:border-[#C5A46D]/60 rounded-full px-3.5 py-2 text-white text-xs font-semibold transition"
               >
-                {Object.keys(CURRENCY_RATES).map((code) => (
-                  <option key={code} value={code} className="bg-[#151A18] text-white">
-                    {code}
-                  </option>
-                ))}
-              </select>
+                <Globe className="w-3.5 h-3.5 text-[#C5A46D]" />
+                <span>{currency}</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 text-white/70 transition-transform ${
+                    currencyOpen ? 'rotate-180' : ''
+                  }`}
+                />
+              </button>
+
+              <AnimatePresence>
+                {currencyOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 8 }}
+                    transition={{ duration: 0.16 }}
+                    className="absolute right-0 mt-2 w-36 bg-[#151A18]/95 backdrop-blur-xl border border-white/15 rounded-xl p-1.5 shadow-2xl z-50"
+                  >
+                    {Object.entries(CURRENCY_RATES).map(([code, info]) => {
+                      const active = currency === code;
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => {
+                            setCurrency(code);
+                            setCurrencyOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition ${
+                            active
+                              ? 'bg-[#142C25] text-[#C5A46D]'
+                              : 'text-white/85 hover:bg-white/10 hover:text-white'
+                          }`}
+                        >
+                          <span>
+                            {code} ({info.symbol.trim()})
+                          </span>
+                          {active && <Check className="w-3.5 h-3.5 text-[#C5A46D]" />}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <Link
               to="/contact"
-              className="hidden sm:inline-flex items-center gap-3 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold text-sm pl-5 pr-1.5 py-1.5 rounded-full transition-all duration-300 shadow-lg group"
+              className="hidden sm:inline-flex items-center gap-2.5 bg-[#C5A46D] hover:bg-[#d4b682] text-[#151A18] font-semibold text-xs xl:text-sm pl-4 xl:pl-5 pr-1.5 py-1.5 rounded-full transition-all duration-300 shadow-lg group whitespace-nowrap"
             >
               <span>Plan Your Trek</span>
-              <span className="w-8 h-8 rounded-full bg-[#151A18] text-white flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
-                <ArrowRight className="w-4 h-4" />
+              <span className="w-7 h-7 xl:w-8 xl:h-8 rounded-full bg-[#151A18] text-white flex items-center justify-center group-hover:translate-x-0.5 transition-transform">
+                <ArrowRight className="w-3.5 h-3.5 xl:w-4 xl:h-4" />
               </span>
             </Link>
 
@@ -313,7 +365,6 @@ export default function Navbar() {
                   </Link>
                 </div>
 
-                {/* Mobile Currency Selector */}
                 <div className="mt-6 flex items-center justify-between bg-white/10 px-4 py-2.5 rounded-lg">
                   <span className="text-xs uppercase tracking-wider text-white/75">Currency</span>
                   <div className="flex gap-1.5">

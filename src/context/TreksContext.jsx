@@ -1,12 +1,27 @@
 import { createContext, useContext, useState, useEffect } from 'react';
+import {
+  collection,
+  doc,
+  onSnapshot,
+  addDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  writeBatch,
+} from 'firebase/firestore';
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+} from 'firebase/auth';
+import { auth, db, isFirebaseConfigured } from '../firebase/config';
 import { treksData as initialTreks } from '../data/treksData';
 import { journalArticles as initialArticles } from '../data/journalData';
 
 const TreksContext = createContext(null);
 
-const TREKS_STORAGE_KEY = 'ascentk2_treks_v2';
-const INQUIRIES_STORAGE_KEY = 'ascentk2_inquiries_v2';
-const JOURNAL_STORAGE_KEY = 'ascentk2_journal_v1';
 const CURRENCY_STORAGE_KEY = 'ascentk2_currency_v1';
 
 export const CURRENCY_RATES = {
@@ -15,6 +30,13 @@ export const CURRENCY_RATES = {
   GBP: { symbol: '£', rate: 0.79, label: 'GBP' },
   PKR: { symbol: 'Rs ', rate: 278, label: 'PKR' },
 };
+
+const initialTrailStatuses = [
+  { id: 'baltoro', name: 'Baltoro Glacier Corridor', status: 'Open', note: 'Dry moraine & stable camps' },
+  { id: 'gondogoro', name: 'Gondogoro La (5,585m)', status: 'Open', note: 'Fixed lines active' },
+  { id: 'shimshal', name: 'Shimshal Pass (4,735m)', status: 'Open', note: 'Jeep track & trails clear' },
+  { id: 'fairy', name: 'Fairy Meadows & Nanga Parbat', status: 'Open', note: 'All cabins operational' },
+];
 
 const defaultDeparturesForTrek = (trek) => {
   if (trek.departures && trek.departures.length > 0) return trek.departures;
@@ -48,46 +70,16 @@ const enrichedInitialTreks = initialTreks.map((t) => ({
   departures: defaultDeparturesForTrek(t),
 }));
 
-const defaultInquiries = [
-  {
-    id: 'inq-101',
-    fullName: 'Marcus Weber',
-    email: 'marcus.weber@example.de',
-    phone: '+49 170 5550142',
-    interestedIn: 'K2 Base Camp Trek',
-    message: 'Looking for a group departure in July for 2 trekkers.',
-    status: 'New',
-    createdAt: '2025-02-18T10:30:00.000Z',
-  },
-];
-
 export function TreksProvider({ children }) {
-  const [treks, setTreks] = useState(() => {
-    try {
-      const saved = localStorage.getItem(TREKS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : enrichedInitialTreks;
-    } catch {
-      return enrichedInitialTreks;
-    }
-  });
+  const [treks, setTreks] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [trailStatuses, setTrailStatuses] = useState(initialTrailStatuses);
+  const [inquiries, setInquiries] = useState([]);
 
-  const [articles, setArticles] = useState(() => {
-    try {
-      const saved = localStorage.getItem(JOURNAL_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : initialArticles;
-    } catch {
-      return initialArticles;
-    }
-  });
-
-  const [inquiries, setInquiries] = useState(() => {
-    try {
-      const saved = localStorage.getItem(INQUIRIES_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : defaultInquiries;
-    } catch {
-      return defaultInquiries;
-    }
-  });
+  const [adminUser, setAdminUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loadingData, setLoadingData] = useState(isFirebaseConfigured);
+  const [dbSynced, setDbSynced] = useState(false);
 
   const [currency, setCurrency] = useState(() => {
     try {
@@ -98,21 +90,138 @@ export function TreksProvider({ children }) {
     }
   });
 
-  useEffect(() => {
-    localStorage.setItem(TREKS_STORAGE_KEY, JSON.stringify(treks));
-  }, [treks]);
-
-  useEffect(() => {
-    localStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(articles));
-  }, [articles]);
-
-  useEffect(() => {
-    localStorage.setItem(INQUIRIES_STORAGE_KEY, JSON.stringify(inquiries));
-  }, [inquiries]);
+  const [compareIds, setCompareIds] = useState([]);
 
   useEffect(() => {
     localStorage.setItem(CURRENCY_STORAGE_KEY, currency);
   }, [currency]);
+
+  // 1. Firebase Auth Listener
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setAuthLoading(false);
+      return;
+    }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setAdminUser(user);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // 2. Public Firestore Real-Time Listeners
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db) {
+      setLoadingData(false);
+      return;
+    }
+
+    const unsubTreks = onSnapshot(
+      collection(db, 'treks'),
+      (snapshot) => {
+        const list = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        setTreks(list);
+        setDbSynced(list.length > 0);
+        setLoadingData(false);
+      },
+      () => {
+        setLoadingData(false);
+      }
+    );
+
+    const unsubArticles = onSnapshot(collection(db, 'articles'), (snapshot) => {
+      const list = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+      setArticles(list);
+    });
+
+    const unsubTrails = onSnapshot(collection(db, 'trailStatuses'), (snapshot) => {
+      if (!snapshot.empty) {
+        const list = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+        setTrailStatuses(list);
+      }
+    });
+
+    return () => {
+      unsubTreks();
+      unsubArticles();
+      unsubTrails();
+    };
+  }, []);
+
+  // 3. Protected Firestore Listener for Inquiries
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || !adminUser) {
+      setInquiries([]);
+      return;
+    }
+
+    const q = query(collection(db, 'inquiries'), orderBy('createdAt', 'desc'));
+    const unsubInquiries = onSnapshot(q, (snapshot) => {
+      const list = snapshot.docs.map((d) => ({ ...d.data(), id: d.id }));
+      setInquiries(list);
+    });
+
+    return () => unsubInquiries();
+  }, [adminUser]);
+
+  const loginAdmin = async (email, password) => {
+    if (!auth) throw new Error('Firebase is not configured. Check your .env file.');
+    return signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const logoutAdmin = async () => {
+    if (!auth) return;
+    await signOut(auth);
+  };
+
+  const uploadImage = async (file, folder = 'ascentk2') => {
+    const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      throw new Error(
+        'Add VITE_CLOUDINARY_CLOUD_NAME & VITE_CLOUDINARY_UPLOAD_PRESET in .env (or paste an image URL directly).'
+      );
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', uploadPreset);
+    formData.append('folder', folder);
+
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    const data = await res.json();
+    if (!res.ok || !data.secure_url) {
+      throw new Error(data?.error?.message || 'Cloudinary upload failed');
+    }
+    return data.secure_url;
+  };
+
+  const seedDefaultDataToFirestore = async () => {
+    if (!db) throw new Error('Firestore not configured.');
+    const batch = writeBatch(db);
+
+    enrichedInitialTreks.forEach((trek) => {
+      const refDoc = doc(db, 'treks', trek.slug);
+      batch.set(refDoc, { ...trek, id: trek.slug });
+    });
+
+    initialArticles.forEach((art) => {
+      const refDoc = doc(db, 'articles', art.slug);
+      batch.set(refDoc, { ...art, id: art.slug });
+    });
+
+    initialTrailStatuses.forEach((trail) => {
+      const refDoc = doc(db, 'trailStatuses', trail.id);
+      batch.set(refDoc, trail);
+    });
+
+    await batch.commit();
+    setDbSynced(true);
+  };
 
   const formatPrice = (usdAmount) => {
     const info = CURRENCY_RATES[currency] || CURRENCY_RATES.USD;
@@ -120,8 +229,28 @@ export function TreksProvider({ children }) {
     return `${info.symbol}${converted.toLocaleString()}`;
   };
 
-  // Trek CRUD
-  const addTrek = (newTrek) => {
+  const toggleCompare = (id) => {
+    setCompareIds((prev) => {
+      if (prev.includes(id)) return prev.filter((item) => item !== id);
+      if (prev.length >= 3) return [...prev.slice(1), id];
+      return [...prev, id];
+    });
+  };
+
+  const clearCompare = () => setCompareIds([]);
+
+  const updateTrailStatus = async (id, updates) => {
+    if (db && adminUser) {
+      await setDoc(
+        doc(db, 'trailStatuses', String(id)),
+        { ...trailStatuses.find((t) => t.id === id), ...updates },
+        { merge: true }
+      );
+    }
+  };
+
+  const addTrek = async (newTrek) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
     const slug =
       newTrek.slug?.trim() ||
       newTrek.name
@@ -131,26 +260,30 @@ export function TreksProvider({ children }) {
 
     const trekObj = {
       ...newTrek,
-      id: Date.now(),
+      id: slug,
       slug,
       departures: newTrek.departures?.length
         ? newTrek.departures
         : defaultDeparturesForTrek({ ...newTrek, slug }),
     };
-    setTreks((prev) => [trekObj, ...prev]);
+
+    await setDoc(doc(db, 'treks', slug), trekObj);
     return trekObj;
   };
 
-  const updateTrek = (id, updatedFields) => {
-    setTreks((prev) => prev.map((t) => (t.id === id ? { ...t, ...updatedFields } : t)));
+  const updateTrek = async (id, updatedFields) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await updateDoc(doc(db, 'treks', String(id)), updatedFields);
   };
 
-  const deleteTrek = (id) => {
-    setTreks((prev) => prev.filter((t) => t.id !== id));
+  const deleteTrek = async (id) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await deleteDoc(doc(db, 'treks', String(id)));
+    setCompareIds((prev) => prev.filter((cid) => cid !== id));
   };
 
-  // Journal CRUD
-  const addArticle = (newArticle) => {
+  const addArticle = async (newArticle) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
     const slug =
       newArticle.slug?.trim() ||
       newArticle.title
@@ -158,54 +291,40 @@ export function TreksProvider({ children }) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/(^-|-$)/g, '');
 
-    const articleObj = {
-      ...newArticle,
-      id: Date.now(),
-      slug,
-    };
-    setArticles((prev) => [articleObj, ...prev]);
+    const articleObj = { ...newArticle, id: slug, slug };
+    await setDoc(doc(db, 'articles', slug), articleObj);
     return articleObj;
   };
 
-  const updateArticle = (id, updatedFields) => {
-    setArticles((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...updatedFields } : a))
-    );
+  const updateArticle = async (id, updatedFields) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await updateDoc(doc(db, 'articles', String(id)), updatedFields);
   };
 
-  const deleteArticle = (id) => {
-    setArticles((prev) => prev.filter((a) => a.id !== id));
+  const deleteArticle = async (id) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await deleteDoc(doc(db, 'articles', String(id)));
   };
 
-  // Inquiry CRUD
-  const addInquiry = (inquiry) => {
-    const newItem = {
+  const addInquiry = async (inquiry) => {
+    if (!db) throw new Error('Firestore not configured.');
+    const payload = {
       ...inquiry,
-      id: `inq-${Date.now()}`,
       status: 'New',
       createdAt: new Date().toISOString(),
     };
-    setInquiries((prev) => [newItem, ...prev]);
-    return newItem;
+    const docRef = await addDoc(collection(db, 'inquiries'), payload);
+    return { ...payload, id: docRef.id };
   };
 
-  const updateInquiryStatus = (id, status) => {
-    setInquiries((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status } : item))
-    );
+  const updateInquiryStatus = async (id, status) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await updateDoc(doc(db, 'inquiries', String(id)), { status });
   };
 
-  const deleteInquiry = (id) => {
-    setInquiries((prev) => prev.filter((item) => item.id !== id));
-  };
-
-  const resetDemoData = () => {
-    setTreks(enrichedInitialTreks);
-    setArticles(initialArticles);
-    setInquiries(defaultInquiries);
-    localStorage.removeItem(TREKS_STORAGE_KEY);
-    localStorage.removeItem(JOURNAL_STORAGE_KEY);
-    localStorage.removeItem(INQUIRIES_STORAGE_KEY);
+  const deleteInquiry = async (id) => {
+    if (!db || !adminUser) throw new Error('Admin login required.');
+    await deleteDoc(doc(db, 'inquiries', String(id)));
   };
 
   return (
@@ -214,9 +333,22 @@ export function TreksProvider({ children }) {
         treks,
         articles,
         inquiries,
+        trailStatuses,
         currency,
         setCurrency,
         formatPrice,
+        compareIds,
+        toggleCompare,
+        clearCompare,
+        adminUser,
+        authLoading,
+        loadingData,
+        dbSynced,
+        loginAdmin,
+        logoutAdmin,
+        uploadImage,
+        seedDefaultDataToFirestore,
+        updateTrailStatus,
         addTrek,
         updateTrek,
         deleteTrek,
@@ -226,7 +358,6 @@ export function TreksProvider({ children }) {
         addInquiry,
         updateInquiryStatus,
         deleteInquiry,
-        resetDemoData,
       }}
     >
       {children}

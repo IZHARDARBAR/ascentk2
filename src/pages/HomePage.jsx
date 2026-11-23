@@ -11,15 +11,45 @@ import {
   Wallet,
   MapPin,
   Maximize2,
+  ZoomIn,
 } from 'lucide-react';
 import { expeditionsData, testimonialsData } from '../data/treksData';
 import { useTreks } from '../context/TreksContext';
 import TrekCard from '../components/TrekCard';
 import VideoModal from '../components/VideoModal';
+import ExpeditionModal from '../components/ExpeditionModal';
+import KarakoramWeatherWidget from '../components/KarakoramWeatherWidget';
+import LightboxModal from '../components/LightboxModal';
+import MobileCardSlider from '../components/MobileCardSlider';
+
+const expeditionWallPhotos = [
+  {
+    src: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Concordia Twilight · 2024 Batch',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Baltoro Granite Spires · Summer Expedition',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1483728642387-6c3bdd6c93e5?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Gondogoro La Sunrise · 5,585m',
+  },
+  {
+    src: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?auto=format&fit=crop&w=1200&q=80',
+    caption: 'Shimshal Pamir Lakes · Wakhi Trail',
+  },
+];
 
 export default function HomePage() {
-  const { treks, formatPrice } = useTreks();
+  const { treks, loadingData, formatPrice } = useTreks();
   const [videoOpen, setVideoOpen] = useState(false);
+  const [selectedExpedition, setSelectedExpedition] = useState(null);
+  const [wallLightboxIdx, setWallLightboxIdx] = useState(null);
+
+  useEffect(() => {
+    document.title = 'AscentK2 Treks | Karakoram Trekking & Mountaineering Expeditions';
+  }, []);
 
   const featuredTreks = treks.filter((t) => t.featured);
   const heroPreviewTreks = featuredTreks.length > 0 ? featuredTreks : treks.slice(0, 3);
@@ -33,7 +63,89 @@ export default function HomePage() {
     return () => clearInterval(timer);
   }, [heroPreviewTreks.length]);
 
-  const activeHeroTrek = heroPreviewTreks[heroSlideIndex % heroPreviewTreks.length] || treks[0];
+  const activeHeroTrek =
+    heroPreviewTreks.length > 0
+      ? heroPreviewTreks[heroSlideIndex % heroPreviewTreks.length]
+      : null;
+
+  const hotspotLink = (index) =>
+    treks[index]?.slug ? `/treks/${treks[index].slug}` : '/treks';
+
+  const renderExpeditionCard = (exp) => (
+    <div className="group relative bg-[#151A18] border border-white/10 rounded-lg overflow-hidden flex flex-col justify-between h-full">
+      <div>
+        <div
+          onClick={() => setSelectedExpedition(exp)}
+          className="relative aspect-[16/11] overflow-hidden cursor-pointer"
+        >
+          <img
+            src={exp.image}
+            alt={exp.name}
+            loading="lazy"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#151A18] via-black/20 to-transparent" />
+          <span className="absolute top-4 left-4 bg-[#C5A46D] text-[#151A18] text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-sm">
+            {exp.tag}
+          </span>
+        </div>
+
+        <div className="p-6">
+          <div className="flex items-center justify-between text-xs text-[#C5A46D] uppercase tracking-widest font-medium mb-2">
+            <span>{exp.duration}</span>
+            <span>Elevation {exp.altitude}</span>
+          </div>
+          <h3
+            onClick={() => setSelectedExpedition(exp)}
+            className="font-serif text-2xl font-semibold text-white cursor-pointer hover:text-[#C5A46D] transition"
+          >
+            {exp.name}
+          </h3>
+          <p className="mt-3 text-sm text-white/70 leading-relaxed">{exp.description}</p>
+        </div>
+      </div>
+
+      <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
+        <span className="font-serif text-xl font-semibold text-[#C5A46D]">
+          From {formatPrice(exp.startingPrice)}
+        </span>
+        <button
+          onClick={() => setSelectedExpedition(exp)}
+          className="inline-flex items-center gap-2 text-sm font-medium text-white hover:text-[#C5A46D] transition"
+        >
+          <span>View Expedition Brief</span>
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderTestimonialCard = (review) => (
+    <div className="bg-white border border-[#D8D5CA] rounded-lg p-7 sm:p-8 flex flex-col justify-between shadow-sm h-full">
+      <div>
+        <div className="flex items-center gap-1 text-[#C5A46D] mb-5">
+          {Array.from({ length: review.rating }).map((_, i) => (
+            <Star key={i} className="w-4 h-4 fill-current" />
+          ))}
+        </div>
+        <p className="text-sm sm:text-base text-[#151A18]/80 leading-relaxed italic">
+          &ldquo;{review.text}&rdquo;
+        </p>
+      </div>
+
+      <div className="mt-8 pt-5 border-t border-[#D8D5CA]/60 flex items-center gap-3.5">
+        <div className="w-11 h-11 rounded-full bg-[#142C25] text-[#C5A46D] font-serif font-semibold flex items-center justify-center shrink-0">
+          {review.initials}
+        </div>
+        <div>
+          <div className="font-semibold text-sm text-[#151A18]">{review.name}</div>
+          <div className="text-xs text-[#151A18]/60">
+            {review.country} · {review.trek}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="bg-[#F6F5F0]">
@@ -62,7 +174,7 @@ export default function HomePage() {
             transition={{ duration: 0.6, delay: 0.5 }}
           >
             <Link
-              to="/treks/k2-base-camp"
+              to={hotspotLink(0)}
               className="pointer-events-auto absolute top-[26%] left-[55%] flex items-center gap-2 group"
             >
               <span className="relative flex h-4 w-4">
@@ -75,7 +187,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              to="/treks/karakoram-grand-traverse"
+              to={hotspotLink(1)}
               className="pointer-events-auto absolute top-[49%] left-[58%] flex items-center gap-2 group"
             >
               <span className="px-3.5 py-1 rounded-full bg-[#151A18]/65 backdrop-blur-md border border-white/20 text-xs font-medium text-white group-hover:border-[#C5A46D] group-hover:text-[#C5A46D] transition">
@@ -85,7 +197,7 @@ export default function HomePage() {
             </Link>
 
             <Link
-              to="/treks/shimshal-pass"
+              to={hotspotLink(2)}
               className="pointer-events-auto absolute top-[62%] left-[47%] flex items-center gap-2 group"
             >
               <span className="px-3.5 py-1 rounded-full bg-[#151A18]/65 backdrop-blur-md border border-white/20 text-xs font-medium text-white group-hover:border-[#C5A46D] group-hover:text-[#C5A46D] transition">
@@ -96,7 +208,7 @@ export default function HomePage() {
           </motion.div>
         </div>
 
-        {/* Hero Main Content */}
+        {/* Hero Content */}
         <div className="relative z-10 max-w-[1440px] w-full mx-auto px-5 sm:px-8 lg:px-12 pt-32 sm:pt-36 pb-10 flex-1 flex flex-col justify-between">
           <div className="max-w-2xl my-auto py-8">
             <motion.p
@@ -197,7 +309,7 @@ export default function HomePage() {
               </div>
             </motion.div>
 
-            {/* Bottom-Right Floating Featured Trek Card */}
+            {/* Bottom-Right Featured Trek Card */}
             {activeHeroTrek && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -269,6 +381,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* LIVE KARAKORAM WEATHER & PASS STATUS */}
+      <KarakoramWeatherWidget />
+
       {/* FEATURED TREKS */}
       <section className="py-20 lg:py-28 max-w-7xl mx-auto px-6 lg:px-10">
         <motion.div
@@ -298,22 +413,45 @@ export default function HomePage() {
           </Link>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {heroPreviewTreks.map((trek, idx) => (
-            <TrekCard key={trek.id} trek={trek} index={idx} />
-          ))}
-        </div>
+        {loadingData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3].map((n) => (
+              <div
+                key={n}
+                className="h-[420px] rounded-lg bg-[#D8D5CA]/40 animate-pulse border border-[#D8D5CA]"
+              />
+            ))}
+          </div>
+        ) : heroPreviewTreks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {heroPreviewTreks.map((trek, idx) => (
+              <TrekCard key={trek.id} trek={trek} index={idx} />
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white border border-[#D8D5CA] rounded-xl p-12 text-center">
+            <p className="font-serif text-2xl text-[#151A18]">
+              New expeditions are being added soon.
+            </p>
+            <Link
+              to="/contact"
+              className="mt-4 inline-block text-sm font-semibold text-[#142C25] underline"
+            >
+              Request a Custom Itinerary
+            </Link>
+          </div>
+        )}
       </section>
 
-      {/* FEATURED EXPEDITIONS */}
+      {/* FEATURED EXPEDITIONS (Mobile Peek Slider + Desktop 3-Col Grid) */}
       <section id="expeditions" className="py-20 lg:py-28 bg-[#142C25] text-white">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
+        <div className="max-w-7xl mx-auto px-0 md:px-6 lg:px-10">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
-            className="max-w-2xl mb-14"
+            className="max-w-2xl mb-10 md:mb-14 px-6 md:px-0"
           >
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C5A46D]">
               High-Altitude Mountaineering
@@ -326,7 +464,15 @@ export default function HomePage() {
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Mobile Peek Carousel */}
+          <MobileCardSlider
+            items={expeditionsData}
+            darkTheme={true}
+            renderItem={(exp) => renderExpeditionCard(exp)}
+          />
+
+          {/* Desktop / Tablet Grid */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8">
             {expeditionsData.map((exp, idx) => (
               <motion.div
                 key={exp.id}
@@ -334,44 +480,8 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, amount: 0.15 }}
                 transition={{ duration: 0.5, delay: idx * 0.1 }}
-                className="group relative bg-[#151A18] border border-white/10 rounded-lg overflow-hidden flex flex-col justify-between"
               >
-                <div>
-                  <div className="relative aspect-[16/11] overflow-hidden">
-                    <img
-                      src={exp.image}
-                      alt={exp.name}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#151A18] via-black/20 to-transparent" />
-                    <span className="absolute top-4 left-4 bg-[#C5A46D] text-[#151A18] text-[11px] font-bold uppercase tracking-widest px-3 py-1 rounded-sm">
-                      {exp.tag}
-                    </span>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="flex items-center justify-between text-xs text-[#C5A46D] uppercase tracking-widest font-medium mb-2">
-                      <span>{exp.duration}</span>
-                      <span>Elevation {exp.altitude}</span>
-                    </div>
-                    <h3 className="font-serif text-2xl font-semibold text-white">{exp.name}</h3>
-                    <p className="mt-3 text-sm text-white/70 leading-relaxed">{exp.description}</p>
-                  </div>
-                </div>
-
-                <div className="px-6 py-4 border-t border-white/10 flex items-center justify-between">
-                  <span className="font-serif text-xl font-semibold text-[#C5A46D]">
-                    {exp.price}
-                  </span>
-                  <Link
-                    to={`/contact?interest=${encodeURIComponent(exp.name.split(' (')[0])}`}
-                    className="inline-flex items-center gap-2 text-sm font-medium text-white hover:text-[#C5A46D] transition"
-                  >
-                    <span>Request Dossier</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </Link>
-                </div>
+                {renderExpeditionCard(exp)}
               </motion.div>
             ))}
           </div>
@@ -421,10 +531,10 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* TESTIMONIALS */}
+      {/* TESTIMONIALS (Mobile Peek Slider + Desktop 3-Col Grid) + PHOTO WALL */}
       <section className="py-20 lg:py-28 bg-[#D8D5CA]/35 border-y border-[#D8D5CA]">
-        <div className="max-w-7xl mx-auto px-6 lg:px-10">
-          <div className="max-w-xl mb-14">
+        <div className="max-w-7xl mx-auto px-0 md:px-6 lg:px-10">
+          <div className="max-w-xl mb-10 md:mb-14 px-6 md:px-0">
             <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#142C25]">
               Expedition Voices
             </span>
@@ -433,7 +543,15 @@ export default function HomePage() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {/* Mobile Peek Carousel */}
+          <MobileCardSlider
+            items={testimonialsData}
+            darkTheme={false}
+            renderItem={(review) => renderTestimonialCard(review)}
+          />
+
+          {/* Desktop / Tablet Grid */}
+          <div className="hidden md:grid md:grid-cols-3 gap-8">
             {testimonialsData.map((review, idx) => (
               <motion.div
                 key={review.id}
@@ -441,32 +559,44 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.45, delay: idx * 0.1 }}
-                className="bg-white border border-[#D8D5CA] rounded-lg p-8 flex flex-col justify-between shadow-sm"
               >
-                <div>
-                  <div className="flex items-center gap-1 text-[#C5A46D] mb-5">
-                    {Array.from({ length: review.rating }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 fill-current" />
-                    ))}
-                  </div>
-                  <p className="text-sm sm:text-base text-[#151A18]/80 leading-relaxed italic">
-                    &ldquo;{review.text}&rdquo;
-                  </p>
-                </div>
-
-                <div className="mt-8 pt-5 border-t border-[#D8D5CA]/60 flex items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-full bg-[#142C25] text-[#C5A46D] font-serif font-semibold flex items-center justify-center shrink-0">
-                    {review.initials}
-                  </div>
-                  <div>
-                    <div className="font-semibold text-sm text-[#151A18]">{review.name}</div>
-                    <div className="text-xs text-[#151A18]/60">
-                      {review.country} · {review.trek}
-                    </div>
-                  </div>
-                </div>
+                {renderTestimonialCard(review)}
               </motion.div>
             ))}
+          </div>
+
+          {/* Photo Wall */}
+          <div className="mt-16 pt-12 border-t border-[#D8D5CA] px-6 md:px-0">
+            <div className="flex items-center justify-between mb-6">
+              <span className="text-xs font-semibold uppercase tracking-[0.22em] text-[#142C25]">
+                Field Dispatches · Recent Expedition Gallery
+              </span>
+              <span className="text-xs text-[#151A18]/60">Click to expand</span>
+            </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {expeditionWallPhotos.map((photo, idx) => (
+                <button
+                  key={photo.caption}
+                  type="button"
+                  onClick={() => setWallLightboxIdx(idx)}
+                  className="group relative aspect-[4/3] rounded-lg overflow-hidden text-left shadow-sm"
+                >
+                  <img
+                    src={photo.src}
+                    alt={photo.caption}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-transparent to-transparent" />
+                  <span className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                    <ZoomIn className="w-4 h-4" />
+                  </span>
+                  <span className="absolute bottom-3 left-3 right-3 text-xs font-medium text-white">
+                    {photo.caption}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -511,6 +641,16 @@ export default function HomePage() {
       </section>
 
       <VideoModal open={videoOpen} onClose={() => setVideoOpen(false)} />
+      <ExpeditionModal
+        expedition={selectedExpedition}
+        onClose={() => setSelectedExpedition(null)}
+      />
+      <LightboxModal
+        images={expeditionWallPhotos.map((p) => p.src)}
+        currentIndex={wallLightboxIdx}
+        onClose={() => setWallLightboxIdx(null)}
+        onChangeIndex={setWallLightboxIdx}
+      />
     </div>
   );
 }

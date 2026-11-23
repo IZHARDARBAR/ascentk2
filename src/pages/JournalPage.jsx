@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, Clock, ArrowRight, X, Calendar, User } from 'lucide-react';
@@ -7,6 +7,10 @@ import { useTreks } from '../context/TreksContext';
 export default function JournalPage() {
   const { articles } = useTreks();
   const [selectedArticle, setSelectedArticle] = useState(null);
+
+  useEffect(() => {
+    document.title = 'Expedition Journal & Guides | AscentK2 Treks';
+  }, []);
 
   return (
     <div className="bg-[#F6F5F0] min-h-screen pt-32 pb-24">

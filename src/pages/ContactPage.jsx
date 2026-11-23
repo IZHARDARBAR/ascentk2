@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   MapPin,
@@ -10,32 +10,35 @@ import {
   CheckCircle2,
   AlertCircle,
 } from 'lucide-react';
+import { expeditionsData } from '../data/treksData';
 import { useTreks } from '../context/TreksContext';
-
-const interestedOptions = [
-  'K2 Base Camp Trek',
-  'Shimshal Pass',
-  'Karakoram Grand Traverse',
-  'Rash Lake Trek',
-  'K2 Expedition',
-  'Broad Peak Expedition',
-  "I'm not sure yet — help me choose",
-];
 
 export default function ContactPage() {
   const [searchParams] = useSearchParams();
-  const { addInquiry } = useTreks();
+  const { treks, addInquiry } = useTreks();
+
+  const interestedOptions = useMemo(() => {
+    const trekNames = treks.map((t) => t.name);
+    const expNames = expeditionsData.map((e) => e.name.split(' (')[0]);
+    return [...new Set([...trekNames, ...expNames]), "I'm not sure yet — help me choose"];
+  }, [treks]);
 
   const [form, setForm] = useState({
     fullName: '',
     email: '',
     phone: '',
-    interestedIn: interestedOptions[0],
+    interestedIn: interestedOptions[0] || "I'm not sure yet — help me choose",
     message: '',
   });
 
   const [errors, setErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [validatedData, setValidatedData] = useState(null);
+
+  useEffect(() => {
+    document.title = 'Contact & Plan Your Trek | AscentK2 Treks';
+  }, []);
 
   useEffect(() => {
     const paramInterest = searchParams.get('interest');
@@ -46,13 +49,13 @@ export default function ContactPage() {
       );
       setForm((prev) => ({
         ...prev,
-        interestedIn: matched || interestedOptions[6],
+        interestedIn: matched || interestedOptions[interestedOptions.length - 1],
         message: paramPackage
-          ? `Hello AscentK2 team, I am interested in the ${paramPackage} package for ${paramInterest}.`
+          ? `Hello AscentK2 team, I am interested in ${paramPackage} for ${paramInterest}.`
           : prev.message,
       }));
     }
-  }, [searchParams]);
+  }, [searchParams, interestedOptions]);
 
   const validate = () => {
     const nextErrors = {};
@@ -67,22 +70,22 @@ export default function ContactPage() {
     return nextErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError('');
     const validationErrors = validate();
     setErrors(validationErrors);
-    if (Object.keys(validationErrors).length === 0) {
-      addInquiry(form);
-      setValidatedData({ ...form });
-    }
-  };
+    if (Object.keys(validationErrors).length > 0) return;
 
-  const buildMailtoLink = (data) => {
-    const subject = encodeURIComponent(`Expedition Inquiry: ${data.interestedIn}`);
-    const body = encodeURIComponent(
-      `Name: ${data.fullName}\nEmail: ${data.email}\nPhone/WhatsApp: ${data.phone}\nInterested In: ${data.interestedIn}\n\nMessage:\n${data.message}`
-    );
-    return `mailto:info@ascentk2treks.com?subject=${subject}&body=${body}`;
+    try {
+      setSubmitting(true);
+      await addInquiry(form);
+      setValidatedData({ ...form });
+    } catch (err) {
+      setSubmitError('Could not save inquiry. Please try WhatsApp or Email below.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const buildWhatsAppLink = (data) => {
@@ -108,7 +111,6 @@ export default function ContactPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* Contact Form */}
           <div className="lg:col-span-7 bg-white border border-[#D8D5CA] rounded-xl p-8 sm:p-10 shadow-sm">
             {validatedData ? (
               <div className="space-y-6 py-4">
@@ -116,31 +118,23 @@ export default function ContactPage() {
                   <CheckCircle2 className="w-7 h-7 text-[#142C25] shrink-0 mt-0.5" />
                   <div>
                     <h2 className="font-serif text-2xl font-semibold">
-                      Saved to Admin Inbox &amp; Ready to Send
+                      Inquiry Received!
                     </h2>
                     <p className="text-sm text-[#151A18]/75 mt-1">
-                      Your inquiry is saved locally in the Admin Portal preview (no live backend
-                      server attached yet). You can also send it directly via Email or WhatsApp:
+                      Thank you, {validatedData.fullName}. Our Gilgit operations desk has received
+                      your inquiry and will reply within 24 hours.
                     </p>
                   </div>
                 </div>
 
                 <div className="bg-[#F6F5F0] border border-[#D8D5CA] rounded-lg p-5 text-sm space-y-2">
-                  <p><strong>Name:</strong> {validatedData.fullName}</p>
+                  <p><strong>Expedition:</strong> {validatedData.interestedIn}</p>
                   <p><strong>Email:</strong> {validatedData.email}</p>
                   <p><strong>Phone/WhatsApp:</strong> {validatedData.phone}</p>
-                  <p><strong>Interested In:</strong> {validatedData.interestedIn}</p>
                   <p><strong>Message:</strong> {validatedData.message}</p>
                 </div>
 
                 <div className="flex flex-wrap gap-3">
-                  <a
-                    href={buildMailtoLink(validatedData)}
-                    className="inline-flex items-center gap-2 bg-[#142C25] text-white font-semibold px-6 py-3 rounded-full text-sm hover:bg-[#151A18] transition"
-                  >
-                    <Mail className="w-4 h-4 text-[#C5A46D]" />
-                    <span>Open in Email Client</span>
-                  </a>
                   <a
                     href={buildWhatsAppLink(validatedData)}
                     target="_blank"
@@ -148,13 +142,16 @@ export default function ContactPage() {
                     className="inline-flex items-center gap-2 bg-[#C5A46D] text-[#151A18] font-semibold px-6 py-3 rounded-full text-sm hover:bg-[#d4b682] transition"
                   >
                     <MessageCircle className="w-4 h-4" />
-                    <span>Send via WhatsApp</span>
+                    <span>Need Faster Reply? Chat on WhatsApp</span>
                   </a>
                   <button
-                    onClick={() => setValidatedData(null)}
+                    onClick={() => {
+                      setValidatedData(null);
+                      setForm({ ...form, message: '' });
+                    }}
                     className="text-sm font-medium text-[#151A18]/70 underline px-3"
                   >
-                    Edit Form
+                    Send Another Message
                   </button>
                 </div>
               </div>
@@ -261,18 +258,22 @@ export default function ContactPage() {
                   )}
                 </div>
 
+                {submitError && (
+                  <p className="text-xs text-red-600 font-medium">{submitError}</p>
+                )}
+
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-3 bg-[#142C25] hover:bg-[#151A18] text-white font-semibold px-8 py-3.5 rounded-full transition shadow-md"
+                  disabled={submitting}
+                  className="inline-flex items-center gap-3 bg-[#142C25] hover:bg-[#151A18] disabled:opacity-60 text-white font-semibold px-8 py-3.5 rounded-full transition shadow-md"
                 >
-                  <span>Send Message</span>
+                  <span>{submitting ? 'Sending...' : 'Send Message'}</span>
                   <Send className="w-4 h-4 text-[#C5A46D]" />
                 </button>
               </form>
             )}
           </div>
 
-          {/* Contact Info & Map */}
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-[#142C25] text-white rounded-xl p-8 space-y-6">
               <h2 className="font-serif text-2xl font-semibold text-[#C5A46D]">

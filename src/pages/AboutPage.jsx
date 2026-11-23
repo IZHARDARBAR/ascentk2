@@ -1,9 +1,14 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { teamData } from '../data/treksData';
 
 export default function AboutPage() {
+  useEffect(() => {
+    document.title = 'About Us & Safety Standards | AscentK2 Treks';
+  }, []);
+
   const stats = [
     { value: '2,000+', label: 'Trekkers Guided' },
     { value: '40+', label: 'Countries' },

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Search, ArrowUpDown } from 'lucide-react';
 import { useTreks } from '../context/TreksContext';
@@ -16,10 +16,14 @@ const filterOptions = [
 ];
 
 export default function AllTreksPage() {
-  const { treks } = useTreks();
+  const { treks, loadingData } = useTreks();
   const [activeFilter, setActiveFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('featured');
+
+  useEffect(() => {
+    document.title = 'Explore All Treks | AscentK2 Treks';
+  }, []);
 
   const filteredAndSortedTreks = useMemo(() => {
     let list = [...treks];
@@ -38,9 +42,9 @@ export default function AllTreksPage() {
       const q = searchQuery.toLowerCase();
       list = list.filter(
         (t) =>
-          t.name.toLowerCase().includes(q) ||
-          t.location.toLowerCase().includes(q) ||
-          t.tagline.toLowerCase().includes(q)
+          (t.name || '').toLowerCase().includes(q) ||
+          (t.location || '').toLowerCase().includes(q) ||
+          (t.tagline || '').toLowerCase().includes(q)
       );
     }
 
@@ -131,8 +135,17 @@ export default function AllTreksPage() {
           </span>
         </div>
 
-        {/* Grid */}
-        {filteredAndSortedTreks.length > 0 ? (
+        {/* Loading Skeleton / Grid / Empty State */}
+        {loadingData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[1, 2, 3, 4, 5, 6].map((n) => (
+              <div
+                key={n}
+                className="h-[420px] rounded-lg bg-[#D8D5CA]/40 animate-pulse border border-[#D8D5CA]"
+              />
+            ))}
+          </div>
+        ) : filteredAndSortedTreks.length > 0 ? (
           <motion.div
             key={`${activeFilter}-${searchQuery}-${sortBy}`}
             initial={{ opacity: 0 }}

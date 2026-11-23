@@ -4,6 +4,8 @@ import { TreksProvider } from './context/TreksContext';
 import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import WhatsAppFloat from './components/WhatsAppFloat';
+import CompareModal from './components/CompareModal';
 import PageTransition from './components/PageTransition';
 import HomePage from './pages/HomePage';
 import AboutPage from './pages/AboutPage';
@@ -43,6 +45,8 @@ export default function App() {
             <AnimatedRoutes />
           </main>
           <Footer />
+          <CompareModal />
+          <WhatsAppFloat />
         </div>
       </BrowserRouter>
     </TreksProvider>
