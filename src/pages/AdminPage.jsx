@@ -440,7 +440,7 @@ export default function AdminPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@ascentk2treks.com"
+                placeholder="your Email"
                 className="w-full px-4 py-3 rounded-lg bg-[#151A18] border border-white/20 text-white text-sm focus:outline-none focus:border-[#C5A46D]"
               />
             </div>
